@@ -29,12 +29,7 @@ npm run build   # dist/ 생성
 열: `단어 ⇥ 언어(ko|en, 비우면 자동) ⇥ 외래어(0/1) ⇥ 어인정(0/1) ⇥ 표준(0/1)` — 첫 줄 헤더는 선택, `#` 줄은 주석.
 형식이 틀린 줄은 빌드 로그에 "건너뜀"으로 표시됩니다.
 
-## 계정 / 전적 / 랭킹 (Supabase + Google 로그인)
+## 계정 / 전적 / 랭킹 (Supabase, 아이디+비밀번호)
 - 백엔드: Supabase 프로젝트 `kkutu-multiplayer` (`src/supabase.js`). 테이블 `profiles`, `match_history`, 함수 `record_game` (RLS·컬럼 권한으로 클라이언트가 통계를 직접 쓰지 못함).
-- Google 로그인 설정 (최초 1회, 대시보드에서):
-  1. Google Cloud Console → OAuth 클라이언트 ID(웹 애플리케이션) 생성
-     - 승인된 리디렉션 URI: `https://bwekwqqeedpwefesjvlu.supabase.co/auth/v1/callback`
-  2. Supabase 대시보드 → Authentication → Sign In / Providers → Google 켜고 Client ID / Secret 입력
-  3. Authentication → URL Configuration
-     - Site URL: `https://<아이디>.github.io/<저장소>/`
-     - Redirect URLs 에 위 주소(와 로컬 테스트용 `http://localhost:5173/`) 추가
+- 로그인은 **아이디+비밀번호**만 있고 게스트는 없습니다. Supabase Auth 는 이메일이 필요해서 아이디를 `kkutu_<아이디>@users.noreply.github.com` 형태의 내부용 이메일로 바꿔 씁니다 (`src/auth.js`). 메일은 발송되지 않으며 비밀번호 찾기는 불가합니다.
+- **필수 대시보드 설정**: Authentication → Sign In / Providers → **Email** → **Confirm email 끄기** (켜져 있으면 가입이 완료되지 않습니다). 같은 화면에서 최소 비밀번호 길이를 올릴 수 있습니다(앱은 6자 이상 요구).

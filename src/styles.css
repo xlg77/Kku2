@@ -179,3 +179,5 @@ small { color: var(--ink-soft); }
 .lb .rank { margin: 0; }
 .save-note { font-weight: 700; color: var(--ink-soft); margin: 0; }
 .save-note.done { color: var(--mint); } .save-note.error { color: var(--coral); }
+.note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+.seg button[role='tab'] { font-size: 16px; padding: 12px 4px; }

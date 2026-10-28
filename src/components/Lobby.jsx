@@ -23,7 +23,7 @@ export default function Lobby({ onStart, loading, error, auth, lbVersion }) {
     e.preventDefault();
     if (loading) return;
     save('settings', s);
-    const nick = (auth.profile && auth.profile.nickname) || s.nick.trim() || '나';
+    const nick = auth.profile.nickname;
     const names = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, s.bots);
     const players = [
       { id: 'me', name: nick, bot: false },
@@ -46,13 +46,6 @@ export default function Lobby({ onStart, loading, error, auth, lbVersion }) {
       <Account auth={auth} />
 
       <form className="panel" onSubmit={go}>
-        {!auth.profile && (
-          <label className="field">
-            <span className="field-label">닉네임 (비로그인 플레이)</span>
-            <input className="text" value={s.nick} maxLength={12} placeholder="나" onChange={(e) => set({ nick: e.target.value })} autoComplete="nickname" />
-          </label>
-        )}
-
         <div className="field">
           <span className="field-label">게임 모드</span>
           <div className="modes" role="radiogroup" aria-label="게임 모드">
@@ -101,7 +94,7 @@ export default function Lobby({ onStart, loading, error, auth, lbVersion }) {
         </div>
 
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="go" type="submit" disabled={!!loading}>
+        <button className="go" type="submit" disabled={!!loading || !auth.profile}>
           {loading ? `사전 불러오는 중… ${Math.round((loading.pct || 0) * 100)}%` : '게임 시작'}
           {loading && <i className="go-fill" style={{ width: (loading.pct || 0) * 100 + '%' }} />}
         </button>
