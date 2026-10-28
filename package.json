@@ -1,0 +1,24 @@
+{
+  "name": "kkutu-free",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/apply-custom.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/apply-custom.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/engine.test.mjs",
+    "words": "node scripts/build-words.mjs ./db.sql public/data"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0"
+  }
+}

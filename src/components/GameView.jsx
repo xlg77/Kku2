@@ -1,0 +1,156 @@
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Game } from '../engine/game.js';
+import { MODES, OPT_LABELS } from '../engine/rules.js';
+import TimerBar from './TimerBar.jsx';
+import Result from './Result.jsx';
+import { sfx, isMuted, setMuted } from '../sfx.js';
+
+const ERR = {
+  chain: (g) => g.mode === 'KAP' ? `‘${g.char}’${g.subChar ? ` (또는 ‘${g.subChar}’)` : ''}(으)로 끝나는 단어를 입력하세요` : `‘${g.char}’${g.subChar ? ` (또는 ‘${g.subChar}’)` : ''}(으)로 시작하는 단어를 입력하세요`,
+  409: () => '이미 쓴 단어예요',
+  404: () => '사전에 없는 단어예요',
+  402: () => '이 단어는 이을 수 없는 “한방 단어”예요 (첫 단어)',
+  403: () => '매너! 다음 사람이 이을 수 없는 단어예요',
+  405: () => '외래어는 쓸 수 없어요',
+  406: () => '엄격 모드: 표준 표제어만 쓸 수 있어요',
+};
+
+export default function GameView({ cfg, onExit, onAgain, onRecorded }) {
+  const game = useMemo(() => new Game(cfg), [cfg]);
+  const s = useSyncExternalStore(game.subscribe, game.getSnapshot);
+  const [muted, setM] = useState(isMuted());
+  const [shake, setShake] = useState(0);
+  const [msg, setMsg] = useState('');
+  const [text, setText] = useState('');
+  const input = useRef(null);
+  const histRef = useRef(null);
+  const prevLast = useRef(0);
+  const mode = MODES[cfg.mode];
+
+  useEffect(() => { game.start(); return () => game.destroy(); }, [game]);
+
+  const myTurn = s.phase === 'turn' && s.seq[s.turn] === 'me';
+  const curId = s.seq[s.turn];
+
+  // 효과음
+  useEffect(() => {
+    if (!s.last || s.last.id === prevLast.current) return;
+    prevLast.current = s.last.id;
+    s.last.ok ? sfx.ok() : sfx.boom();
+  }, [s.last]);
+  useEffect(() => { if (s.phase === 'roundReady') sfx.round(); if (s.phase === 'over') sfx.win(); }, [s.phase]);
+
+  // 내 차례가 되면 입력창에 포커스 / 메시지 초기화
+  useEffect(() => {
+    if (myTurn) { setMsg(''); setText(''); input.current?.focus({ preventScroll: true }); }
+  }, [myTurn, s.turnAt]);
+  useEffect(() => { histRef.current?.scrollTo({ top: histRef.current.scrollHeight, behavior: 'smooth' }); }, [s.chain?.length]);
+
+  function submit(e) {
+    e.preventDefault();
+    if (!myTurn) return;
+    const r = game.submit('me', text);
+    if (r.ok) { setText(''); setMsg(''); return; }
+    if (r.code === 'empty') return;
+    const m = (ERR[r.code] || (() => '사용할 수 없는 단어예요'))(game.getSnapshot().phase === 'turn' ? game : game);
+    setMsg(m); setShake((n) => n + 1); sfx.bad();
+    input.current?.select();
+  }
+
+  const toggleMute = () => { setMuted(!muted); setM(!muted); };
+  const activeOpts = Object.keys(OPT_LABELS).filter((k) => cfg.opts[k]).map((k) => OPT_LABELS[k][0]);
+  const order = s.seq.map((id) => s.players[id]);
+  const chain = s.chain || [];
+  const recent = chain.slice(-6);
+
+  if (s.phase === 'over') return <Result s={s} cfg={cfg} onExit={onExit} onAgain={onAgain} onRecorded={onRecorded} />;
+
+  const showChar = s.phase !== 'idle' && s.phase !== 'starting';
+  const roundEnd = s.phase === 'roundEnd';
+
+  return (
+    <main className="game">
+      <header className="topbar">
+        <button className="ghost" onClick={() => { if (confirm('게임을 나갈까요?')) onExit(); }} aria-label="나가기">← 나가기</button>
+        <div className="top-info">
+          <b>{mode.name}</b>
+          <span>라운드 {Math.min(s.round || 1, s.rounds)}/{s.rounds}</span>
+          <span>연결 {chain.length}</span>
+        </div>
+        <button className="ghost" onClick={toggleMute} aria-label={muted ? '소리 켜기' : '소리 끄기'}>{muted ? '🔇' : '🔊'}</button>
+      </header>
+
+      <TimerBar className="round-bar" label="라운드 남은 시간" since={s.turnAt} total={s.roundTimeLeft} active={s.phase === 'turn'} danger={0.2} />
+
+      <section className={'stage' + (roundEnd ? ' boom' : '')} aria-live="polite">
+        {s.phase === 'roundReady' && (
+          <div className="banner" key={'r' + s.round}>
+            <small>ROUND {s.round}</small>
+            <strong>{s.char}{s.subChar ? <em>({s.subChar})</em> : null}</strong>
+            {s.mission && <span className="mission">미션 글자 <b>{s.mission}</b></span>}
+          </div>
+        )}
+        {(s.phase === 'turn' || s.phase === 'turnResult' || roundEnd) && (
+          <>
+            <div className="charbox" key={s.char + chain.length}>
+              <span className="big">{mode.lang === 'en' ? s.char.toUpperCase() : s.char}</span>
+              {s.subChar && <span className="sub-char">{s.subChar}</span>}
+              <span className="dir">{cfg.mode === 'KAP' ? '(으)로 끝나는' : '(으)로 시작하는'}{cfg.mode === 'KKT' ? ' 3글자' : ''}</span>
+            </div>
+            {s.mission && s.mission !== true && <div className="mission">미션 <b>{s.mission}</b></div>}
+            {roundEnd && (
+              <div className="boomtext">
+                <b>💥 {s.players[s.last?.pid]?.name} 시간 초과!</b>
+                {s.hint && <span>예시 단어: <u>{s.hint}</u></span>}
+              </div>
+            )}
+          </>
+        )}
+        {(s.phase === 'idle' || s.phase === 'starting') && <div className="banner"><strong>준비…</strong></div>}
+      </section>
+
+      <TimerBar className="turn-bar" label="내 차례 남은 시간" since={s.turnAt} total={s.turnTime} active={s.phase === 'turn'} />
+
+      <div className="hist" ref={histRef} aria-label="지금까지 이은 단어">
+        {recent.map((w, i) => {
+          const idx = chain.length - recent.length + i;
+          return <span key={idx + w} className={'chip' + (i === recent.length - 1 ? ' new' : '')}>{w}</span>;
+        })}
+        {!chain.length && <span className="hint">첫 단어를 이어보세요!</span>}
+      </div>
+
+      <section className="players" aria-label="플레이어">
+        {order.map((p) => {
+          const lastHere = s.last && s.last.pid === p.id ? s.last : null;
+          return (
+            <div key={p.id} className={'player' + (curId === p.id && s.phase !== 'roundEnd' ? ' cur' : '') + (p.id === 'me' ? ' me' : '') + (roundEnd && s.last?.pid === p.id ? ' bomb' : '')}>
+              <div className="avatar" style={{ '--h': hue(p.id) }}>{p.name.slice(0, 1)}</div>
+              <div className="pinfo">
+                <b>{p.name}</b>
+                <small>{p.bot ? `봇 · ${['하수', '초보', '중수', '고수', '신'][p.level]}` : '나'}</small>
+              </div>
+              <div className="pscore">{p.score}</div>
+              {lastHere && <span key={lastHere.id} className={'delta' + (lastHere.ok ? '' : ' neg')}>{lastHere.ok ? '+' + (lastHere.score - (lastHere.bonus || 0)) + (lastHere.bonus ? ` +${lastHere.bonus}` : '') : lastHere.score}</span>}
+            </div>
+          );
+        })}
+      </section>
+
+      <form className={'dock' + (myTurn ? ' on' : '')} onSubmit={submit}>
+        <p className={'msg' + (msg ? ' show' : '')} key={shake} role="alert">{msg || (myTurn ? ERR.chain(game.getSnapshot()) : ' ')}</p>
+        <div className="row">
+          <input
+            ref={input} className="text big-input" value={text} onChange={(e) => setText(e.target.value)}
+            disabled={!myTurn} placeholder={myTurn ? '여기에 단어 입력' : s.phase === 'turn' ? `${s.players[curId]?.name} 차례…` : '잠시만요…'}
+            autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="send" lang={mode.lang}
+            aria-label="단어 입력"
+          />
+          <button className="send" type="submit" disabled={!myTurn || !text.trim()}>입력</button>
+        </div>
+        {activeOpts.length > 0 && <p className="rules">{activeOpts.join(' · ')}</p>}
+      </form>
+    </main>
+  );
+}
+
+const hue = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
