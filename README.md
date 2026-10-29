@@ -27,9 +27,9 @@ npm run build   # dist/ 생성
 ## 관리자 단어 추가 (DB)
 - 추가 단어는 Supabase 테이블 `custom_words` 에 저장되고, 게임이 시작될 때 사전에 합쳐집니다. (재배포 불필요)
 - `admins` 테이블에 등록된 계정만 올릴/지울 수 있습니다 (RLS). 관리자로 로그인하면 로비 아래에 "관리자: 단어 올리기" 패널이 나타납니다.
-- 관리자 등록: Supabase SQL Editor 에서 `insert into public.admins select id from auth.users where email = 'kkutu_<아이디>@users.noreply.github.com';`
+- 관리자 등록: Supabase SQL Editor 에서 `insert into public.admins select id from auth.users where email = 'kkutu_<아이디>@gmail.com';`
 
 ## 계정 / 전적 / 랭킹 (Supabase, 아이디+비밀번호)
 - 백엔드: Supabase 프로젝트 `kkutu-multiplayer` (`src/supabase.js`). 테이블 `profiles`, `match_history`, 함수 `record_game` (RLS·컬럼 권한으로 클라이언트가 통계를 직접 쓰지 못함).
-- 로그인은 **아이디+비밀번호**만 있고 게스트는 없습니다. Supabase Auth 는 이메일이 필요해서 아이디를 `kkutu_<아이디>@users.noreply.github.com` 형태의 내부용 이메일로 바꿔 씁니다 (`src/auth.js`). 메일은 발송되지 않으며 비밀번호 찾기는 불가합니다.
+- 로그인은 **아이디+비밀번호**만 있고 게스트는 없습니다. Supabase Auth 는 이메일이 필요해서 아이디를 `kkutu_<아이디>@gmail.com` 형태의 내부용 이메일로 바꿔 씁니다 (`src/auth.js`). 메일은 발송되지 않으며 비밀번호 찾기는 불가합니다.
 - **필수 대시보드 설정**: Authentication → Sign In / Providers → **Email** → **Confirm email 끄기** (켜져 있으면 가입이 완료되지 않습니다). 같은 화면에서 최소 비밀번호 길이를 올릴 수 있습니다(앱은 6자 이상 요구).

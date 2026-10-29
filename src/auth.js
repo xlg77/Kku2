@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase.js';
 
 // Supabase Auth 는 이메일이 필요하므로 아이디를 가짜 이메일로 바꿔 쓴다. (메일은 발송되지 않음 — 대시보드에서 "Confirm email" 을 꺼야 함)
-export const EMAIL_DOMAIN = 'users.noreply.github.com';
+export const EMAIL_DOMAIN = 'gmail.com';
 export const ID_RE = /^[a-z0-9_]{3,16}$/;
 export const MIN_PW = 6;
 const toEmail = (id) => `kkutu_${id}@${EMAIL_DOMAIN}`;
