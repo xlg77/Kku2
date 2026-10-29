@@ -25,11 +25,16 @@ export function useAuth() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [ready, setReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState('');
 
   const refresh = useCallback(async (u) => {
-    if (!u) { setProfile(null); return; }
-    try { setProfile(await ensureProfile(u)); setError(''); } catch (e) { setError('프로필을 불러오지 못했어요: ' + (e.message || e)); }
+    if (!u) { setProfile(null); setIsAdmin(false); return; }
+    try {
+      setProfile(await ensureProfile(u)); setError('');
+      const a = await supabase.from('admins').select('user_id').eq('user_id', u.id).maybeSingle();
+      setIsAdmin(!!a.data);
+    } catch (e) { setError('프로필을 불러오지 못했어요: ' + (e.message || e)); }
   }, []);
 
   useEffect(() => {
@@ -65,7 +70,7 @@ export function useAuth() {
     const { error: e } = await supabase.from('profiles').update({ nickname }).eq('id', user.id);
     if (e) setError(e.message); else refresh(user);
   };
-  return { user, profile, ready, error, signUp, signIn, signOut, rename, refresh: () => refresh(user) };
+  return { user, profile, ready, isAdmin, error, signUp, signIn, signOut, rename, refresh: () => refresh(user) };
 }
 
 export async function recordGame({ mode, score, rank, players }) {
@@ -87,4 +92,35 @@ function friendly(e) {
   if (m.includes('password') && (m.includes('least') || m.includes('weak') || m.includes('short'))) return '비밀번호가 너무 짧거나 약해요';
   if (m.includes('rate') || e.status === 429) return '요청이 너무 많아요. 잠시 후 다시 시도해주세요';
   return '오류: ' + (e.message || e);
+}
+
+const PAGE = 1000;
+/** 관리자가 올린 추가 단어 전체 (PostgREST 기본 1000행 제한 때문에 페이지로 나눠 읽는다) */
+export async function fetchCustomWords(lang) {
+  const out = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase.from('custom_words').select('word,loanword,injeong,strict')
+      .eq('lang', lang).order('word').range(from, from + PAGE - 1);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return out;
+}
+export async function countCustomWords() {
+  const { count, error } = await supabase.from('custom_words').select('word', { count: 'exact', head: true });
+  if (error) throw error;
+  return count;
+}
+export async function uploadCustomWords(rows, onProgress) {
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from('custom_words').upsert(rows.slice(i, i + 500), { onConflict: 'word' });
+    if (error) return error.message;
+    onProgress && onProgress(Math.min(rows.length, i + 500));
+  }
+  return null;
+}
+export async function deleteCustomWord(word) {
+  const { error, count } = await supabase.from('custom_words').delete({ count: 'exact' }).eq('word', word);
+  return error ? error.message : count ? null : '그런 추가 단어가 없어요';
 }

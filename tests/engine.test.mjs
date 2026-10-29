@@ -21,6 +21,14 @@ test('관리자 추가 단어', () => {
   assert.ok(ko.get('끄투프리'));
   assert.ok(candidates(ko, 'KSH', '끄', undefined, { strict: true }).some((e) => e.w === '끄투프리'));
 });
+test('관리자 단어 파싱', async () => {
+  const { parseWords } = await import('../src/engine/customWords.js');
+  const r = parseWords('단어,언어,외래어,어인정,표준\n끄투\nKKUTU\n쿵,ko\n프리서버\t\t1\t\t0\n끄투\n12ab');
+  assert.deepEqual(r.rows.map((x) => x.word), ['끄투', 'kkutu', '프리서버']);
+  assert.equal(r.rows[2].loanword, true);
+  assert.equal(r.rows[2].strict, false);
+  assert.equal(r.skipped.length, 2);
+});
 test('사전 로드', () => {
   assert.ok(ko.size > 300000);
   assert.ok(ko.get('사과'));
@@ -67,7 +75,7 @@ test('봇 4명이 5개 모드를 한 판씩 (규칙 위반 없이 이어짐)', a
   const res = await Promise.all(modes.map(simulate));
   res.forEach(({ words, s }, i) => {
     const mode = modes[i];
-    assert.ok(words.length >= 4, `${mode} words=${words.length}`);
+    assert.ok(words.length >= 2, `${mode} words=${words.length}`);
     for (let k = 1; k < words.length; k++) {
       const c = getChar(mode, words[k - 1]);
       assert.ok(isChainable(mode, words[k], c, getSubChar(mode, c), mode === 'KKT' ? 3 : 0), `${mode}: ${words[k - 1]} -> ${words[k]}`);

@@ -181,3 +181,8 @@ small { color: var(--ink-soft); }
 .save-note.done { color: var(--mint); } .save-note.error { color: var(--coral); }
 .note { margin: 0; font-size: 13px; color: var(--ink-soft); }
 .seg button[role='tab'] { font-size: 16px; padding: 12px 4px; }
+.admin { margin-top: 20px; } .admin h2 { margin: 0; font-size: 18px; } .admin h2 small { margin-left: 6px; font-size: 13px; }
+.admin textarea { resize: vertical; font-family: inherit; }
+.admin-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; } .admin-row .seg { flex: 1; min-width: 200px; }
+.filebtn { display: inline-grid; place-items: center; cursor: pointer; }
+code { background: color-mix(in srgb, var(--ink) 10%, transparent); padding: 1px 5px; border-radius: 5px; font-size: 0.92em; }

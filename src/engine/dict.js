@@ -44,7 +44,7 @@ function push(map, k, e) {
 }
 
 const cache = new Map();
-export function loadDict(lang, onProgress) {
+export function loadDict(lang, onProgress, fetchExtra) {
   if (cache.has(lang)) return cache.get(lang);
   const p = (async () => {
     const res = await fetch(`${import.meta.env?.BASE_URL ?? "./"}data/${lang}.txt`);
@@ -67,12 +67,8 @@ export function loadDict(lang, onProgress) {
     }
     await new Promise((r) => setTimeout(r, 0)); // 화면 갱신 기회
     const dict = new Dict(lang, text);
-    try { // 관리자 추가 단어 (없으면 무시)
-      const r = await fetch(`${import.meta.env?.BASE_URL ?? './'}data/custom.json`);
-      if (r.ok) {
-        const c = await r.json();
-        for (const x of c[lang] || []) dict.add(x.w, (x.loan ? 1 : 0) | (x.inj ? 2 : 0), x.strict ? 1 : 0);
-      }
+    try { // 관리자가 DB 에 올린 추가 단어 (실패해도 기본 사전으로 진행)
+      for (const x of (fetchExtra ? await fetchExtra() : [])) dict.add(x.word, (x.loanword ? 1 : 0) | (x.injeong ? 2 : 0), x.strict ? 1 : 0);
     } catch { /* ignore */ }
     return dict;
   })();

@@ -24,10 +24,10 @@ npm run build   # dist/ 생성
 ## 라이선스
 원본과 같은 GPL-3.0 (`LICENSE`). 영어 사전은 Princeton WordNet 자료를 포함합니다.
 
-## 관리자 단어 추가 (TSV)
-`words/custom.tsv` 에 단어를 적어 push 하면, 배포 때 사전에 합쳐집니다. 저장소에 쓰기 권한이 있는 사람(=관리자)만 가능합니다.
-열: `단어 ⇥ 언어(ko|en, 비우면 자동) ⇥ 외래어(0/1) ⇥ 어인정(0/1) ⇥ 표준(0/1)` — 첫 줄 헤더는 선택, `#` 줄은 주석.
-형식이 틀린 줄은 빌드 로그에 "건너뜀"으로 표시됩니다.
+## 관리자 단어 추가 (DB)
+- 추가 단어는 Supabase 테이블 `custom_words` 에 저장되고, 게임이 시작될 때 사전에 합쳐집니다. (재배포 불필요)
+- `admins` 테이블에 등록된 계정만 올릴/지울 수 있습니다 (RLS). 관리자로 로그인하면 로비 아래에 "관리자: 단어 올리기" 패널이 나타납니다.
+- 관리자 등록: Supabase SQL Editor 에서 `insert into public.admins select id from auth.users where email = 'kkutu_<아이디>@users.noreply.github.com';`
 
 ## 계정 / 전적 / 랭킹 (Supabase, 아이디+비밀번호)
 - 백엔드: Supabase 프로젝트 `kkutu-multiplayer` (`src/supabase.js`). 테이블 `profiles`, `match_history`, 함수 `record_game` (RLS·컬럼 권한으로 클라이언트가 통계를 직접 쓰지 못함).

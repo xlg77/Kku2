@@ -3,6 +3,7 @@ import { MODES, OPT_LABELS, BOT_LEVELS } from '../engine/rules.js';
 import { load, save } from '../storage.js';
 import Account from './Account.jsx';
 import Leaderboard from './Leaderboard.jsx';
+import AdminPanel from './AdminPanel.jsx';
 
 const BOT_NAMES = ['끄투왕', '말잇기장인', '사전먹은봇', '쿵쿵따마스터', '초성귀신', '한방단어', '어휘력만렙', '단어수집가', '글자요정', '말꼬리봇', '낱말도둑', '받침귀신'];
 const TIMES = [30, 60, 90, 120, 150];
@@ -101,6 +102,8 @@ export default function Lobby({ onStart, loading, error, auth, lbVersion }) {
       </form>
 
       <Leaderboard meId={auth.user?.id} version={lbVersion} />
+
+      {auth.isAdmin && <AdminPanel />}
 
       <footer className="foot">
         <p>
