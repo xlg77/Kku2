@@ -24,12 +24,11 @@ npm run build   # dist/ 생성
 ## 라이선스
 원본과 같은 GPL-3.0 (`LICENSE`). 영어 사전은 Princeton WordNet 자료를 포함합니다.
 
-## 관리자 단어 추가 (DB)
-- 추가 단어는 Supabase 테이블 `custom_words` 에 저장되고, 게임이 시작될 때 사전에 합쳐집니다. (재배포 불필요)
-- `admins` 테이블에 등록된 계정만 올릴/지울 수 있습니다 (RLS). 관리자로 로그인하면 로비 아래에 "관리자: 단어 올리기" 패널이 나타납니다.
-- 관리자 등록: Supabase SQL Editor 에서 `insert into public.admins select id from auth.users where email = 'kkutu_<아이디>@gmail.com';`
-
-## 계정 / 전적 / 랭킹 (Supabase, 아이디+비밀번호)
-- 백엔드: Supabase 프로젝트 `kkutu-multiplayer` (`src/supabase.js`). 테이블 `profiles`, `match_history`, 함수 `record_game` (RLS·컬럼 권한으로 클라이언트가 통계를 직접 쓰지 못함).
-- 로그인은 **아이디+비밀번호**만 있고 게스트는 없습니다. Supabase Auth 는 이메일이 필요해서 아이디를 `kkutu_<아이디>@gmail.com` 형태의 내부용 이메일로 바꿔 씁니다 (`src/auth.js`). 메일은 발송되지 않으며 비밀번호 찾기는 불가합니다.
-- **필수 대시보드 설정**: Authentication → Sign In / Providers → **Email** → **Confirm email 끄기** (켜져 있으면 가입이 완료되지 않습니다). 같은 화면에서 최소 비밀번호 길이를 올릴 수 있습니다(앱은 6자 이상 요구).
+## 계정 / 전적 / 랭킹 / 관리자 단어 (Supabase DB, 이메일 없음)
+- 백엔드는 Supabase 프로젝트 `kkutu-multiplayer` 의 **Postgres 만** 씁니다. Supabase Auth(이메일)는 쓰지 않고, DB 함수 `kk_signup / kk_login / kk_me / kk_logout / kk_rename / kk_record_game / kk_admin_*` 가 자체 계정을 처리합니다.
+- 비밀번호는 DB 안에서 bcrypt 로 저장·검증, 세션 토큰은 SHA-256 해시로만 저장(30일). 로그인 10분에 8회 실패 시 잠금, IP 당 시간당 10회 가입 제한.
+- 계정·세션 테이블은 비공개 스키마 `kkutu_private` 에 있어 브라우저에서 직접 읽을 수 없습니다. 랭킹(`profiles`)과 추가 단어(`custom_words`)만 공개 읽기입니다.
+- **비밀번호 찾기는 불가능**합니다 (이메일이 없음). 필요하면 관리자가 SQL 로 재설정해야 합니다.
+- 관리자 지정: Supabase SQL Editor 에서 `update kkutu_private.accounts set is_admin = true where username = '<아이디>';`
+- 관리자로 로그인하면 로비 아래에 "단어 올리기" 패널이 나타납니다 (추가 단어는 DB `custom_words` 에 저장, 재배포 불필요).
+- 비밀번호 재설정(관리자용): `update kkutu_private.accounts set password_hash = extensions.crypt('<새 비밀번호>', extensions.gen_salt('bf', 10)) where username = '<아이디>';`

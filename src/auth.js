@@ -1,81 +1,81 @@
+// 이메일 없는 자체 계정: 아이디+비밀번호 → DB 함수(kk_signup/kk_login)가 세션 토큰을 발급한다.
+// 비밀번호는 DB 안에서 bcrypt 로만 저장·검증되고, 토큰은 해시로만 저장된다.
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase.js';
+import { load, save } from './storage.js';
 
-// Supabase Auth 는 이메일이 필요하므로 아이디를 가짜 이메일로 바꿔 쓴다. (메일은 발송되지 않음 — 대시보드에서 "Confirm email" 을 꺼야 함)
-export const EMAIL_DOMAIN = 'gmail.com';
 export const ID_RE = /^[a-z0-9_]{3,16}$/;
-export const MIN_PW = 6;
-const toEmail = (id) => `kkutu_${id}@${EMAIL_DOMAIN}`;
-const clean = (s) => (s || '').replace(/\s+/g, ' ').trim().slice(0, 12);
+export const MIN_PW = 8;
 
-async function ensureProfile(user) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-  if (error) throw error;
-  if (data) return data;
-  const m = user.user_metadata || {};
-  const nickname = clean(m.nickname || (user.email || '').replace(/^kkutu_/, '').split('@')[0]) || '플레이어';
-  const { error: e2 } = await supabase.from('profiles').insert({ id: user.id, nickname });
-  if (e2 && e2.code !== '23505') throw e2; // 23505: 동시에 만들어진 경우
-  const r = await supabase.from('profiles').select('*').eq('id', user.id).single();
-  if (r.error) throw r.error;
-  return r.data;
+const getToken = () => load('token', null);
+const setToken = (t) => save('token', t);
+
+const ERRORS = {
+  bad_credentials: '아이디 또는 비밀번호가 틀렸어요',
+  username_taken: '이미 사용 중인 아이디예요',
+  too_many: '시도가 너무 많아요. 잠시 후 다시 해주세요',
+  bad_input: '입력값을 확인해주세요',
+  unauthorized: '로그인이 만료됐어요. 다시 로그인해주세요',
+  forbidden: '관리자만 할 수 있어요',
+};
+const msg = (e) => ERRORS[e] || '오류: ' + e;
+
+/** RPC 호출 → {data} 또는 {error: 한국어 메시지} */
+async function rpc(fn, args) {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) return { error: '서버 오류: ' + error.message };
+  if (data && data.error) return { error: msg(data.error), code: data.error };
+  return { data };
 }
 
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [ready, setReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
 
-  const refresh = useCallback(async (u) => {
-    if (!u) { setProfile(null); setIsAdmin(false); return; }
-    try {
-      setProfile(await ensureProfile(u)); setError('');
-      const a = await supabase.from('admins').select('user_id').eq('user_id', u.id).maybeSingle();
-      setIsAdmin(!!a.data);
-    } catch (e) { setError('프로필을 불러오지 못했어요: ' + (e.message || e)); }
+  const apply = useCallback((d) => {
+    setUser(d ? { id: d.profile.id } : null);
+    setProfile(d ? d.profile : null);
+    setIsAdmin(!!(d && d.is_admin));
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!alive) return;
-      const u = data.session?.user ?? null;
-      setUser(u); setReady(true); refresh(u);
-    }).catch(() => setReady(true));
-    const { data: sub } = supabase.auth.onAuthStateChange((_ev, session) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      // onAuthStateChange 콜백 안에서 바로 supabase 호출을 await 하면 교착될 수 있어 한 틱 미룬다
-      setTimeout(() => refresh(u), 0);
-    });
-    return () => { alive = false; sub.subscription.unsubscribe(); };
-  }, [refresh]);
+  const refresh = useCallback(async () => {
+    const token = getToken();
+    if (!token) { apply(null); return; }
+    const r = await rpc('kk_me', { p_token: token });
+    if (r.error) {
+      if (r.code === 'unauthorized') { setToken(null); apply(null); } else setError(r.error);
+      return;
+    }
+    setError(''); apply(r.data);
+  }, [apply]);
 
-  const signUp = async (id, password, nickname) => {
-    const { data, error: e } = await supabase.auth.signUp({ email: toEmail(id), password, options: { data: { nickname: clean(nickname) || id } } });
-    if (e) return friendly(e);
-    if (!data.session) return '가입은 됐지만 로그인되지 않았어요. 관리자 설정(이메일 확인)을 확인해주세요.';
+  useEffect(() => { refresh().finally(() => setReady(true)); }, [refresh]);
+
+  const finish = (r) => {
+    if (r.error) return r.error;
+    setToken(r.data.token); setError(''); apply(r.data);
     return null;
   };
-  const signIn = async (id, password) => {
-    const { error: e } = await supabase.auth.signInWithPassword({ email: toEmail(id), password });
-    return e ? friendly(e) : null;
+  const signUp = async (username, password, nickname) => finish(await rpc('kk_signup', { p_username: username, p_password: password, p_nickname: nickname }));
+  const signIn = async (username, password) => finish(await rpc('kk_login', { p_username: username, p_password: password }));
+  const signOut = async () => {
+    const t = getToken();
+    setToken(null); apply(null);
+    if (t) await supabase.rpc('kk_logout', { p_token: t });
   };
-  const signOut = () => supabase.auth.signOut();
-  const rename = async (nick) => {
-    const nickname = clean(nick);
-    if (!nickname || !user) return;
-    const { error: e } = await supabase.from('profiles').update({ nickname }).eq('id', user.id);
-    if (e) setError(e.message); else refresh(user);
+  const rename = async (nickname) => {
+    const r = await rpc('kk_rename', { p_token: getToken(), p_nickname: nickname });
+    if (r.error) setError(r.error); else refresh();
   };
-  return { user, profile, ready, isAdmin, error, signUp, signIn, signOut, rename, refresh: () => refresh(user) };
+  return { user, profile, ready, isAdmin, error, signUp, signIn, signOut, rename, refresh };
 }
 
 export async function recordGame({ mode, score, rank, players }) {
-  const { error } = await supabase.rpc('record_game', { p_mode: mode, p_score: Math.round(score), p_rank: rank, p_players: players });
-  return error ? error.message : null;
+  const r = await rpc('kk_record_game', { p_token: getToken(), p_mode: mode, p_score: Math.round(score), p_rank: rank, p_players: players });
+  return r.error || null;
 }
 
 export async function fetchLeaderboard(limit = 10) {
@@ -83,15 +83,6 @@ export async function fetchLeaderboard(limit = 10) {
     .gt('games', 0).order('total_score', { ascending: false }).limit(limit);
   if (error) throw error;
   return data;
-}
-
-function friendly(e) {
-  const m = (e.message || '').toLowerCase();
-  if (m.includes('invalid login')) return '아이디 또는 비밀번호가 틀렸어요';
-  if (m.includes('already')) return '이미 사용 중인 아이디예요';
-  if (m.includes('password') && (m.includes('least') || m.includes('weak') || m.includes('short'))) return '비밀번호가 너무 짧거나 약해요';
-  if (m.includes('rate') || e.status === 429) return '요청이 너무 많아요. 잠시 후 다시 시도해주세요';
-  return '오류: ' + (e.message || e);
 }
 
 const PAGE = 1000;
@@ -113,14 +104,16 @@ export async function countCustomWords() {
   return count;
 }
 export async function uploadCustomWords(rows, onProgress) {
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await supabase.from('custom_words').upsert(rows.slice(i, i + 500), { onConflict: 'word' });
-    if (error) return error.message;
-    onProgress && onProgress(Math.min(rows.length, i + 500));
+  const CH = 1000;
+  for (let i = 0; i < rows.length; i += CH) {
+    const r = await rpc('kk_admin_add_words', { p_token: getToken(), p_rows: rows.slice(i, i + CH) });
+    if (r.error) return r.error;
+    onProgress && onProgress(Math.min(rows.length, i + CH));
   }
   return null;
 }
 export async function deleteCustomWord(word) {
-  const { error, count } = await supabase.from('custom_words').delete({ count: 'exact' }).eq('word', word);
-  return error ? error.message : count ? null : '그런 추가 단어가 없어요';
+  const r = await rpc('kk_admin_delete_word', { p_token: getToken(), p_word: word });
+  if (r.error) return r.error;
+  return r.data.count ? null : '그런 추가 단어가 없어요';
 }

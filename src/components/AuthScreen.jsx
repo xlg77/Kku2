@@ -57,7 +57,7 @@ export default function AuthScreen({ auth }) {
             <input className="text" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
           </label>
         )}
-        {signup && <p className="note">⚠️ 이메일을 받지 않아서 비밀번호를 잃어버리면 복구할 수 없어요.</p>}
+        {signup && <p className="note">⚠️ 이메일 없이 가입해서 비밀번호를 잃어버리면 복구할 수 없어요. 꼭 기억해두세요.</p>}
         {(err || auth.error) && <p className="error" role="alert">{err || auth.error}</p>}
         <button className="go" type="submit" disabled={busy}>{busy ? '잠시만요…' : signup ? '가입하고 시작' : '로그인'}</button>
       </form>
