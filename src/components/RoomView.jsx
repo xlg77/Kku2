@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { MODES, BOT_LEVELS } from '../engine/rules.js';
 import SettingsFields from './SettingsFields.jsx';
 import GameView from './GameView.jsx';
-import { MAX_PLAYERS } from '../multi/room.js';
 
 export default function RoomView({ session, meId, onLeave }) {
   const st = useSyncExternalStore(session.subscribe, session.getState);
@@ -28,18 +27,18 @@ export default function RoomView({ session, meId, onLeave }) {
 
   const s = st.settings;
   const mode = MODES[s.mode];
-  const total = st.members.length + Math.min(s.bots, MAX_PLAYERS - st.members.length);
+  const total = st.members.length + Math.min(s.bots, st.max - st.members.length);
   const start = async () => { setStarting(true); try { await session.startGame(); } finally { setStarting(false); } };
 
   return (
     <main className="lobby">
       <header className="topbar">
-        <button className="ghost" onClick={() => { if (confirm(isHost ? '방을 닫고 나갈까요? 모두 나가게 돼요.' : '방을 나갈까요?')) onLeave(); }}>← 나가기</button>
+        <button className="ghost" onClick={() => { if (confirm('방을 나갈까요?')) onLeave(); }}>← 나가기</button>
         <b>{st.name}</b><span className="code">방 {session.code}</span>
       </header>
 
       <section className="panel">
-        <h2 className="h2">참가자 <small>{st.members.length}/{st.max}명{s.bots > 0 ? ` + 봇 ${Math.min(s.bots, MAX_PLAYERS - st.members.length)}명` : ''}</small></h2>
+        <h2 className="h2">참가자 <small>{st.members.length}/{st.max}명{s.bots > 0 ? ` + 봇 ${Math.min(s.bots, st.max - st.members.length)}명` : ''}</small></h2>
         <ul className="members">
           {st.members.map((m) => (
             <li key={m.id} className={m.id === meId ? 'me' : ''}>
@@ -55,7 +54,7 @@ export default function RoomView({ session, meId, onLeave }) {
       {isHost ? (
         <section className="panel">
           <h2 className="h2">게임 설정</h2>
-          <SettingsFields s={s} set={(p) => session.updateSettings(p)} minBots={0} maxBots={MAX_PLAYERS - st.members.length} />
+          <SettingsFields s={s} set={(p) => session.updateSettings(p)} minBots={0} maxBots={st.max - st.members.length} />
           <button className="go" onClick={start} disabled={starting || !session.canStart()}>
             {starting ? '시작하는 중…' : session.canStart() ? `게임 시작 (${total}명)` : '2명 이상이어야 시작할 수 있어요 (봇을 추가해도 돼요)'}
           </button>
@@ -72,7 +71,7 @@ export default function RoomView({ session, meId, onLeave }) {
         <h2 className="h2">채팅</h2>
         <div className="chatlog" ref={chatRef}>
           {!st.chat.length && <small>아직 대화가 없어요</small>}
-          {st.chat.map((c, i) => <p key={i} className={c.id === meId ? 'mine' : ''}><b>{c.nickname}</b> {c.text}</p>)}
+          {st.chat.map((c) => <p key={c.key} className={c.id === meId ? 'mine' : ''}><b>{c.nickname}</b> {c.text}</p>)}
         </div>
         <form className="rename" onSubmit={(e) => { e.preventDefault(); session.sendChat(text); setText(''); }}>
           <input className="text" value={text} maxLength={200} onChange={(e) => setText(e.target.value)} placeholder="메시지" aria-label="채팅 입력" />

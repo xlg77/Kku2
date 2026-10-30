@@ -7,8 +7,7 @@ import AuthScreen from './components/AuthScreen.jsx';
 import { loadDict } from './engine/dict.js';
 import { MODES } from './engine/rules.js';
 import { useAuth, fetchCustomWords } from './auth.js';
-import { supabase } from './supabase.js';
-import { LobbyNet, RoomSession, newCode } from './multi/room.js';
+import { LobbyNet, RoomSession, createRoom as createRoomRpc, joinRoom as joinRoomRpc } from './multi/room.js';
 
 const dictFor = (lang, onProgress) => loadDict(lang, onProgress, () => fetchCustomWords(lang));
 
@@ -22,7 +21,7 @@ export default function App() {
   const sessionRef = useRef(null);
 
   const getLobby = () => {
-    if (!lobbyRef.current) { lobbyRef.current = new LobbyNet(supabase, auth.user.id); lobbyRef.current.start(); }
+    if (!lobbyRef.current) { lobbyRef.current = new LobbyNet(); lobbyRef.current.start(); }
     return lobbyRef.current;
   };
   const closeNet = () => {
@@ -49,26 +48,20 @@ export default function App() {
   const home = () => { closeNet(); setLbVersion((v) => v + 1); auth.refresh(); setScreen({ name: 'lobby' }); };
   const toRooms = () => { setError(''); getLobby(); setScreen({ name: 'rooms' }); };
 
-  async function openRoom({ code, host, name, max, hostId, settings }) {
+  async function enter(p) {
     setError('');
+    const r = await p;
+    if (r.error) { setError(r.error); return; }
     const me = { id: auth.user.id, nickname: auth.profile.nickname };
-    const session = new RoomSession({
-      sb: supabase, lobby: host ? getLobby() : null, code, me, hostId, isHost: host, name, max, settings,
-      loadDictFn: (lang) => dictFor(lang),
-    });
-    try {
-      await session.join();
-    } catch (e) {
-      session.leave(); setError(e.message || '방에 들어가지 못했어요'); return;
-    }
+    const session = new RoomSession({ room: r.room, me });
     sessionRef.current = session;
     setScreen({ name: 'room', session });
   }
   const createRoom = (name, max) => {
     const s = loadSettings();
-    return openRoom({ code: newCode(), host: true, name, max, hostId: auth.user.id, settings: { ...s, bots: Math.min(s.bots, 1) } });
+    return enter(createRoomRpc(name, max, { mode: s.mode, rounds: s.rounds, time: s.time, bots: Math.min(s.bots, 1), level: s.level, opts: s.opts }));
   };
-  const joinRoom = (r) => openRoom({ code: r.code, host: false, name: r.name, max: r.max, hostId: r.hostId, settings: { ...loadSettings(), mode: r.mode, rounds: r.rounds, time: r.time } });
+  const joinRoom = (r) => enter(joinRoomRpc(r.code));
   const leaveRoom = () => {
     if (sessionRef.current) { sessionRef.current.leave(); sessionRef.current = null; }
     setScreen({ name: 'rooms' });

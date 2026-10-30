@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/engine.test.mjs tests/multiplayer.test.mjs",
+    "test": "node --test tests/engine.test.mjs",
     "words": "node scripts/build-words.mjs ./db.sql public/data"
   },
   "dependencies": {

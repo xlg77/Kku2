@@ -1,12 +1,8 @@
-// 서버 없는 멀티플레이: Supabase Realtime(Broadcast + Presence)만 사용한다.
-//  - 방 목록: 'kkutu-lobby' 채널의 Presence 에 방장이 방 정보를 올려둔다 (방장이 나가면 자동으로 사라짐)
-//  - 게임: 'kkutu-room-<코드>' 채널. 방장의 브라우저가 Game 엔진을 돌리고, 참가자는 단어를 보내고 상태를 받는다.
-import { Game } from '../engine/game.js';
-import { MODES, cleanOpts } from '../engine/rules.js';
-import { BOT_NAMES } from '../engine/names.js';
+// 서버 권위 멀티플레이: 방·차례·판정·점수는 전부 Supabase DB 함수(kk_room_*)가 처리한다.
+// 클라이언트는 입력을 보내고(kk_room_submit) 주기적으로 상태를 받아(kk_room_tick) 그리기만 한다.
+import { supabase } from '../supabase.js';
+import { getToken } from '../auth.js';
 
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-export const newCode = () => Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 export const MAX_PLAYERS = 8;
 
 export class Store {
@@ -16,189 +12,120 @@ export class Store {
   set(s) { this.s = s; this.l.forEach((f) => f()); }
 }
 
-/** 방 목록 (Presence) */
-export class LobbyNet {
-  constructor(sb, myId) { this.sb = sb; this.myId = myId; this.rooms = []; this.cbs = new Set(); this.info = null; this.ready = false; }
-  start() {
-    this.ch = this.sb.channel('kkutu-lobby', { config: { presence: { key: this.myId } } });
-    this.ch.on('presence', { event: 'sync' }, () => this.sync());
-    this.ch.subscribe((st) => {
-      if (st === 'SUBSCRIBED') { this.ready = true; if (this.info) this.ch.track(this.info); }
-    });
-  }
-  sync() {
-    const st = this.ch.presenceState();
-    const byCode = new Map();
-    for (const k of Object.keys(st)) for (const m of st[k]) if (m.role === 'room' && m.code) byCode.set(m.code, { ...m });
-    this.rooms = [...byCode.values()];
-    this.cbs.forEach((f) => f(this.rooms));
-  }
-  watch(f) { this.cbs.add(f); f(this.rooms); return () => this.cbs.delete(f); }
-  advertise(info) { this.info = { role: 'room', ...info }; if (this.ready) this.ch.track(this.info); }
-  unadvertise() { this.info = null; if (this.ready) this.ch.untrack(); }
-  stop() { try { this.sb.removeChannel(this.ch); } catch { /* ignore */ } }
+const ERRS = {
+  not_found: '방이 사라졌어요', full: '방이 가득 찼어요', in_game: '이미 게임이 진행 중이에요',
+  forbidden: '방장만 할 수 있어요', need_players: '2명 이상이어야 시작할 수 있어요',
+  unauthorized: '로그인이 만료됐어요. 다시 로그인해주세요', not_member: '방에서 나가졌어요', busy: '잠시 후 다시 해주세요',
+};
+const errMsg = (e) => ERRS[e] || ('오류: ' + e);
+
+async function call(fn, args) {
+  const { data, error } = await supabase.rpc(fn, { p_token: getToken(), ...args });
+  if (error) return { error: '서버 오류: ' + error.message };
+  if (data && data.error) return { error: errMsg(data.error), code: data.error };
+  return { data };
 }
 
-/** 방 하나 (방장/참가자 공용) */
+/** 방 목록 (3초마다 갱신) */
+export class LobbyNet {
+  constructor() { this.rooms = []; this.cbs = new Set(); this.timer = null; }
+  start() { this.poll(); this.timer = setInterval(() => this.poll(), 3000); }
+  async poll() {
+    const { data } = await supabase.rpc('kk_list_rooms');
+    if (Array.isArray(data)) { this.rooms = data; this.cbs.forEach((f) => f(this.rooms)); }
+  }
+  watch(f) { this.cbs.add(f); f(this.rooms); return () => this.cbs.delete(f); }
+  stop() { clearInterval(this.timer); this.cbs.clear(); }
+}
+
+export async function createRoom(name, max, settings) {
+  const r = await call('kk_room_create', { p_name: name, p_max: max, p_settings: settings });
+  return r.error ? { error: r.error } : { room: r.data.room };
+}
+export async function joinRoom(code) {
+  const r = await call('kk_room_join', { p_code: code });
+  return r.error ? { error: r.error } : { room: r.data.room };
+}
+
 export class RoomSession {
-  constructor({ sb, lobby, code, me, hostId, isHost, name, max, settings, loadDictFn }) {
-    this.sb = sb; this.lobby = lobby; this.code = code; this.me = me; this.isHost = isHost; this.loadDictFn = loadDictFn;
-    this.s = { phase: 'waiting', name: name || '', max: max || MAX_PLAYERS, settings, members: [], hostId, chat: [], closed: '' };
+  constructor({ room, me }) {
+    this.me = me; this.code = room.code;
     this.store = new Store(null);
     this.l = new Set();
-    this.order = [];
-    this.pending = new Map();
-    this.nonce = 0;
-    this.sawHost = isHost;
-    this.game = null;
+    this.s = { phase: 'waiting', name: '', max: MAX_PLAYERS, settings: room.settings, members: [], hostId: room.host_id, chat: [], closed: '' };
+    this.version = -1; this.dead = false; this.busy = false; this.offset = 0;
+    this.apply(room, Date.now());
+    this.schedule();
   }
+  get isHost() { return this.s.hostId === this.me.id; }
   subscribe = (f) => { this.l.add(f); return () => this.l.delete(f); };
   getState = () => this.s;
   set(patch) { this.s = { ...this.s, ...patch }; this.l.forEach((f) => f()); }
 
-  join() {
-    return new Promise((resolve, reject) => {
-      this.ch = this.sb.channel(`kkutu-room-${this.code}`, { config: { broadcast: { self: false }, presence: { key: this.me.id } } });
-      this.ch.on('presence', { event: 'sync' }, () => this.onPresence());
-      this.ch.on('broadcast', { event: 'chat' }, ({ payload }) => this.onChat(payload));
-      this.ch.on('broadcast', { event: 'room' }, ({ payload }) => this.onRoom(payload));
-      this.ch.on('broadcast', { event: 'state' }, ({ payload }) => this.onState(payload));
-      this.ch.on('broadcast', { event: 'ack' }, ({ payload }) => this.onAck(payload));
-      this.ch.on('broadcast', { event: 'submit' }, ({ payload }) => this.onSubmit(payload));
-      this.ch.on('broadcast', { event: 'closed' }, () => this.onClosed('방장이 방을 닫았어요'));
-      this.ch.subscribe((st) => {
-        if (st === 'SUBSCRIBED') { this.ch.track({ id: this.me.id, nickname: this.me.nickname }); this.advertise(); resolve(); }
-        else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') reject(new Error('방에 연결하지 못했어요'));
-      });
-    });
-  }
-  send(event, payload) { return this.ch.send({ type: 'broadcast', event, payload }); }
-
-  /* ---------- 멤버 ---------- */
-  onPresence() {
-    const st = this.ch.presenceState();
-    const cur = new Map();
-    for (const k of Object.keys(st)) { const m = st[k][0]; if (m && m.id) cur.set(m.id, { id: m.id, nickname: m.nickname }); }
-    if (this.isHost) {
-      const gone = this.order.filter((id) => !cur.has(id));
-      this.order = this.order.filter((id) => cur.has(id));
-      for (const id of cur.keys()) if (!this.order.includes(id)) this.order.push(id);
-      if (this.order.includes(this.me.id)) { this.order = [this.me.id, ...this.order.filter((i) => i !== this.me.id)]; }
-      const members = this.order.map((id) => cur.get(id));
-      this.set({ members });
-      if (this.game) for (const id of gone) this.game.replaceWithBot(id);
-      this.broadcastRoom(); this.advertise();
-    } else {
-      if (cur.has(this.s.hostId)) this.sawHost = true;
-      else if (this.sawHost) this.onClosed('방장이 나갔어요');
-    }
-  }
-  broadcastRoom() {
-    const { phase, name, max, settings, members, hostId } = this.s;
-    this.send('room', { phase, name, max, settings, members, hostId });
-  }
-  onRoom(p) {
-    if (this.isHost) return;
-    const back = this.s.phase !== 'waiting' && p.phase === 'waiting';
-    this.set({ phase: p.phase, name: p.name, max: p.max, settings: p.settings, members: p.members, hostId: p.hostId });
-    if (back) this.store.set(null);
-  }
-  advertise() {
-    if (!this.isHost || !this.lobby) return;
-    const { name, max, settings, members, phase } = this.s;
-    this.lobby.advertise({ code: this.code, name, hostId: this.me.id, hostName: this.me.nickname, mode: settings.mode, rounds: settings.rounds, time: settings.time, count: members.length, max, status: phase === 'waiting' ? 'waiting' : 'playing' });
+  /** 서버가 준 방 상태를 반영. sentAt = 요청을 보낸 시각(내 시계) */
+  apply(room, sentAt) {
+    if (!room || this.dead) return;
+    const recvAt = Date.now();
+    this.offset = room.now - (sentAt + recvAt) / 2; // 서버 시계 - 내 시계
+    if (room.version === this.version) return;
+    this.version = room.version;
+    const chat = (room.chat || []).map((c) => ({ id: c.from === this.me.nickname ? this.me.id : 'x' + c.id, key: c.id, nickname: c.from, text: c.text }));
+    this.set({ phase: room.status, name: room.name, max: room.max, settings: room.settings, members: room.members.map((m) => ({ id: m.id, nickname: m.nickname })), hostId: room.host_id, chat });
+    const st = room.state;
+    if (st && room.status !== 'waiting') {
+      const snap = { ...st };
+      if (snap.turnAt) snap.turnAt = snap.turnAt - this.offset;
+      this.store.set(snap);
+    } else if (this.store.getSnapshot()) this.store.set(null);
   }
 
-  /* ---------- 채팅 ---------- */
-  onChat(c) { this.set({ chat: [...this.s.chat, c].slice(-60) }); }
-  sendChat(text) {
-    text = (text || '').trim().slice(0, 200);
-    if (!text) return;
-    const c = { id: this.me.id, nickname: this.me.nickname, text, ts: Date.now() };
-    this.onChat(c); this.send('chat', c);
+  schedule() {
+    if (this.dead) return;
+    const playing = this.s.phase === 'playing';
+    this.timer = setTimeout(() => this.tick(), playing ? 600 : 1500);
   }
+  async tick() {
+    if (this.dead) return;
+    const sent = Date.now();
+    const r = await call('kk_room_tick', { p_code: this.code });
+    if (this.dead) return;
+    if (r.error) {
+      if (r.code === 'not_found' || r.code === 'not_member' || r.code === 'unauthorized') { this.close(r.error); return; }
+    } else this.apply(r.data.room, sent);
+    this.schedule();
+  }
+  close(reason) { this.dead = true; clearTimeout(this.timer); this.set({ closed: reason }); this.dead = true; }
 
-  /* ---------- 방장: 설정 / 게임 진행 ---------- */
-  updateSettings(patch) {
+  async act(fn, args) {
+    const sent = Date.now();
+    const r = await call(fn, { p_code: this.code, ...args });
+    if (r.error) return { ok: false, error: r.error };
+    if (r.data.room) { this.version = -1; this.apply(r.data.room, sent); }
+    return { ok: r.data.ok !== false, code: r.data.code };
+  }
+  async updateSettings(patch) {
     if (!this.isHost || this.s.phase !== 'waiting') return;
     const settings = { ...this.s.settings, ...patch };
-    const m = this.s.members.length;
-    settings.bots = Math.max(0, Math.min(MAX_PLAYERS - m, settings.bots));
-    this.set({ settings });
-    this.broadcastRoom(); this.advertise();
+    settings.bots = Math.max(0, Math.min(MAX_PLAYERS - this.s.members.length, settings.bots));
+    this.set({ settings }); // 즉시 반영, 서버 응답으로 확정
+    await this.act('kk_room_settings', { p_settings: settings });
   }
   canStart() {
-    const { members, settings } = this.s;
-    return members.length + Math.min(settings.bots, MAX_PLAYERS - members.length) >= 2;
+    const { members, settings, max } = this.s;
+    return members.length + Math.min(settings.bots, max - members.length) >= 2;
   }
-  async startGame() {
-    if (!this.isHost || this.s.phase !== 'waiting' || !this.canStart()) return;
-    const { members, settings } = this.s;
-    this.set({ phase: 'playing' }); this.broadcastRoom(); this.advertise();
-    const dict = await this.loadDictFn(MODES[settings.mode].lang);
-    const nbots = Math.min(settings.bots, MAX_PLAYERS - members.length);
-    const names = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, nbots);
-    const players = [
-      ...members.map((m) => ({ id: m.id, name: m.nickname, bot: false })),
-      ...names.map((n, i) => ({ id: 'bot' + i, name: n, bot: true, level: settings.level })),
-    ];
-    const game = new Game({ dict, mode: settings.mode, opts: cleanOpts(settings.mode, settings.opts), rounds: settings.rounds, time: settings.time, players });
-    this.game = game;
-    game.subscribe(() => {
-      const { log, ...snap } = game.getSnapshot(); // eslint-disable-line no-unused-vars
-      this.store.set(snap);
-      this.send('state', { snap, sentAt: Date.now() });
-      if (snap.phase === 'over' && this.s.phase !== 'over') { this.set({ phase: 'over' }); this.broadcastRoom(); this.advertise(); }
-    });
-    game.start();
-  }
-  resetToWaiting() {
-    if (!this.isHost) return;
-    if (this.game) { this.game.destroy(); this.game = null; }
-    this.store.set(null);
-    this.set({ phase: 'waiting' });
-    this.broadcastRoom(); this.advertise();
-  }
-
-  /* ---------- 단어 제출 ---------- */
-  submit = (text) => {
-    if (this.isHost) return Promise.resolve(this.game ? this.game.submit(this.me.id, text) : { ok: false, code: 'phase' });
-    const nonce = ++this.nonce;
-    return new Promise((resolve) => {
-      const t = setTimeout(() => { this.pending.delete(nonce); resolve({ ok: false, code: 'timeout' }); }, 4000);
-      this.pending.set(nonce, (r) => { clearTimeout(t); resolve(r); });
-      this.send('submit', { nonce, pid: this.me.id, text });
-    });
+  startGame() { return this.act('kk_room_start', {}); }
+  resetToWaiting() { return this.act('kk_room_reset', {}); }
+  sendChat(text) { return this.act('kk_room_chat', { p_text: text }); }
+  submit = async (text) => {
+    const r = await this.act('kk_room_submit', { p_text: text });
+    if (r.error) return { ok: false, code: 'timeout' };
+    return r;
   };
-  onSubmit(p) {
-    if (!this.isHost || !this.game || !p || typeof p.text !== 'string') return;
-    if (!this.s.members.some((m) => m.id === p.pid)) return;
-    const r = this.game.submit(p.pid, p.text.slice(0, 40));
-    this.send('ack', { nonce: p.nonce, pid: p.pid, ok: r.ok, code: r.code });
-  }
-  onAck(p) {
-    if (this.isHost || !p || p.pid !== this.me.id) return;
-    const f = this.pending.get(p.nonce);
-    if (f) { this.pending.delete(p.nonce); f({ ok: p.ok, code: p.code }); }
-  }
-  onState({ snap, sentAt }) {
-    if (this.isHost) return;
-    const s = { ...snap };
-    if (s.turnAt) s.turnAt = Date.now() - (sentAt - s.turnAt); // 방장 시계 → 내 시계
-    this.store.set(s);
-    if (s.phase === 'over' && this.s.phase !== 'over') this.set({ phase: 'over' });
-    else if (s.phase !== 'over' && this.s.phase === 'waiting') this.set({ phase: 'playing' });
-  }
-  onClosed(reason) { if (!this.s.closed) this.set({ closed: reason }); }
-
-  /* ---------- 나가기 ---------- */
   leave() {
-    try {
-      if (this.isHost) { this.send('closed', {}); if (this.lobby) this.lobby.unadvertise(); }
-      if (this.game) { this.game.destroy(); this.game = null; }
-      this.ch.untrack();
-      this.sb.removeChannel(this.ch);
-    } catch { /* ignore */ }
+    if (this.dead) { this.l.clear(); return; }
+    this.dead = true; clearTimeout(this.timer);
+    supabase.rpc('kk_room_leave', { p_token: getToken(), p_code: this.code }).then(() => {}, () => {});
     this.l.clear();
   }
 }

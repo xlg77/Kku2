@@ -29,12 +29,12 @@ export default function RoomList({ lobby, nickname, onCreate, onJoin, onBack, er
         {!rooms.length && <small>지금 열린 방이 없어요. 방을 만들어 친구를 초대해보세요! 친구는 이 목록에서 방을 찾아 들어오면 돼요.</small>}
         <ul className="roomlist">
           {rooms.map((r) => {
-            const full = r.count >= r.max, playing = r.status === 'playing';
+            const full = r.count >= r.max, playing = r.status !== 'waiting';
             return (
               <li key={r.code}>
                 <div className="rinfo">
                   <b>{r.name}</b>
-                  <small>{MODES[r.mode]?.name || r.mode} · {r.rounds}라운드 · {r.time}초 · 방장 {r.hostName}</small>
+                  <small>{MODES[r.mode]?.name || r.mode} · 방장 {r.host}</small>
                 </div>
                 <span className="rcount">{r.count}/{r.max}</span>
                 <button className="ghost" disabled={full || playing} onClick={() => onJoin(r)}>{playing ? '진행 중' : full ? '가득 참' : '입장'}</button>

@@ -7,7 +7,7 @@ import { load, save } from './storage.js';
 export const ID_RE = /^[a-z0-9_]{3,16}$/;
 export const MIN_PW = 8;
 
-const getToken = () => load('token', null);
+export const getToken = () => load('token', null);
 const setToken = (t) => save('token', t);
 
 const ERRORS = {
