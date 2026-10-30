@@ -132,3 +132,6 @@ export function makeTitle(dict, mode, rounds, opts) {
   const ex = lang === 'ko' ? '가나다라마바사아자차' : 'abcdefghij';
   return ex.split('').slice(0, len);
 }
+
+export const cleanOpts = (modeKey, opts) =>
+  Object.fromEntries(Object.keys(OPT_LABELS).map((k) => [k, MODES[modeKey].opts.includes(k) && !!opts[k]]));

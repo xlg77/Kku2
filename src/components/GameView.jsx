@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Game } from '../engine/game.js';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { MODES, OPT_LABELS } from '../engine/rules.js';
 import TimerBar from './TimerBar.jsx';
 import Result from './Result.jsx';
 import { sfx, isMuted, setMuted } from '../sfx.js';
 
 const ERR = {
+  timeout: () => '응답이 없어요. 다시 시도해주세요',
   chain: (g) => g.mode === 'KAP' ? `‘${g.char}’${g.subChar ? ` (또는 ‘${g.subChar}’)` : ''}(으)로 끝나는 단어를 입력하세요` : `‘${g.char}’${g.subChar ? ` (또는 ‘${g.subChar}’)` : ''}(으)로 시작하는 단어를 입력하세요`,
   409: () => '이미 쓴 단어예요',
   404: () => '사전에 없는 단어예요',
@@ -15,9 +15,12 @@ const ERR = {
   406: () => '엄격 모드: 표준 표제어만 쓸 수 있어요',
 };
 
-export default function GameView({ cfg, onExit, onAgain, onRecorded }) {
-  const game = useMemo(() => new Game(cfg), [cfg]);
-  const s = useSyncExternalStore(game.subscribe, game.getSnapshot);
+/**
+ * 게임 화면. store(subscribe/getSnapshot)가 주는 스냅샷만 그린다.
+ * 혼자 하기: store = Game, 멀티플레이: store = 방장이 보내준 상태. submit(text) → Promise<{ok, code}>
+ */
+export default function GameView({ store, meId, submit: submitFn, record, onExit, onAgain, againLabel, onRecorded }) {
+  const s = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [muted, setM] = useState(isMuted());
   const [shake, setShake] = useState(0);
   const [msg, setMsg] = useState('');
@@ -25,45 +28,44 @@ export default function GameView({ cfg, onExit, onAgain, onRecorded }) {
   const input = useRef(null);
   const histRef = useRef(null);
   const prevLast = useRef(0);
-  const mode = MODES[cfg.mode];
+  const mode = MODES[s?.mode || 'KSH'];
 
-  useEffect(() => { game.start(); return () => game.destroy(); }, [game]);
-
-  const myTurn = s.phase === 'turn' && s.seq[s.turn] === 'me';
-  const curId = s.seq[s.turn];
+  const myTurn = !!s && s.phase === 'turn' && s.seq[s.turn] === meId;
+  const curId = s ? s.seq[s.turn] : null;
 
   // 효과음
   useEffect(() => {
-    if (!s.last || s.last.id === prevLast.current) return;
+    if (!s || !s.last || s.last.id === prevLast.current) return;
     prevLast.current = s.last.id;
     s.last.ok ? sfx.ok() : sfx.boom();
-  }, [s.last]);
-  useEffect(() => { if (s.phase === 'roundReady') sfx.round(); if (s.phase === 'over') sfx.win(); }, [s.phase]);
+  }, [s?.last]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (s?.phase === 'roundReady') sfx.round(); if (s?.phase === 'over') sfx.win(); }, [s?.phase]);
 
   // 내 차례가 되면 입력창에 포커스 / 메시지 초기화
   useEffect(() => {
     if (myTurn) { setMsg(''); setText(''); input.current?.focus({ preventScroll: true }); }
-  }, [myTurn, s.turnAt]);
-  useEffect(() => { histRef.current?.scrollTo({ top: histRef.current.scrollHeight, behavior: 'smooth' }); }, [s.chain?.length]);
+  }, [myTurn, s?.turnAt]);
+  useEffect(() => { histRef.current?.scrollTo({ top: histRef.current.scrollHeight, behavior: 'smooth' }); }, [s?.chain?.length]);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!myTurn) return;
-    const r = game.submit('me', text);
+    const r = await submitFn(text);
     if (r.ok) { setText(''); setMsg(''); return; }
-    if (r.code === 'empty') return;
-    const m = (ERR[r.code] || (() => '사용할 수 없는 단어예요'))(game.getSnapshot().phase === 'turn' ? game : game);
+    if (r.code === 'empty' || r.code === 'turn' || r.code === 'phase') return;
+    const m = (ERR[r.code] || (() => '사용할 수 없는 단어예요'))(store.getSnapshot() || s);
     setMsg(m); setShake((n) => n + 1); sfx.bad();
     input.current?.select();
   }
 
   const toggleMute = () => { setMuted(!muted); setM(!muted); };
-  const activeOpts = Object.keys(OPT_LABELS).filter((k) => cfg.opts[k]).map((k) => OPT_LABELS[k][0]);
+  if (!s) return <main className="lobby"><p className="sub" style={{ textAlign: 'center', marginTop: 80 }}>게임을 준비하고 있어요…</p></main>;
+  const activeOpts = Object.keys(OPT_LABELS).filter((k) => s.opts && s.opts[k]).map((k) => OPT_LABELS[k][0]);
   const order = s.seq.map((id) => s.players[id]);
   const chain = s.chain || [];
   const recent = chain.slice(-6);
 
-  if (s.phase === 'over') return <Result s={s} cfg={cfg} onExit={onExit} onAgain={onAgain} onRecorded={onRecorded} />;
+  if (s.phase === 'over') return <Result s={s} meId={meId} record={record} onExit={onExit} onAgain={onAgain} againLabel={againLabel} onRecorded={onRecorded} />;
 
   const showChar = s.phase !== 'idle' && s.phase !== 'starting';
   const roundEnd = s.phase === 'roundEnd';
@@ -95,7 +97,7 @@ export default function GameView({ cfg, onExit, onAgain, onRecorded }) {
             <div className="charbox" key={s.char + chain.length}>
               <span className="big">{mode.lang === 'en' ? s.char.toUpperCase() : s.char}</span>
               {s.subChar && <span className="sub-char">{s.subChar}</span>}
-              <span className="dir">{cfg.mode === 'KAP' ? '(으)로 끝나는' : '(으)로 시작하는'}{cfg.mode === 'KKT' ? ' 3글자' : ''}</span>
+              <span className="dir">{s.mode === 'KAP' ? '(으)로 끝나는' : '(으)로 시작하는'}{s.mode === 'KKT' ? ' 3글자' : ''}</span>
             </div>
             {s.mission && s.mission !== true && <div className="mission">미션 <b>{s.mission}</b></div>}
             {roundEnd && (
@@ -123,11 +125,11 @@ export default function GameView({ cfg, onExit, onAgain, onRecorded }) {
         {order.map((p) => {
           const lastHere = s.last && s.last.pid === p.id ? s.last : null;
           return (
-            <div key={p.id} className={'player' + (curId === p.id && s.phase !== 'roundEnd' ? ' cur' : '') + (p.id === 'me' ? ' me' : '') + (roundEnd && s.last?.pid === p.id ? ' bomb' : '')}>
+            <div key={p.id} className={'player' + (curId === p.id && s.phase !== 'roundEnd' ? ' cur' : '') + (p.id === meId ? ' me' : '') + (roundEnd && s.last?.pid === p.id ? ' bomb' : '')}>
               <div className="avatar" style={{ '--h': hue(p.id) }}>{p.name.slice(0, 1)}</div>
               <div className="pinfo">
                 <b>{p.name}</b>
-                <small>{p.bot ? `봇 · ${['하수', '초보', '중수', '고수', '신'][p.level]}` : '나'}</small>
+                <small>{p.bot ? `봇 · ${['하수', '초보', '중수', '고수', '신'][p.level]}` : p.id === meId ? '나' : '플레이어'}</small>
               </div>
               <div className="pscore">{p.score}</div>
               {lastHere && <span key={lastHere.id} className={'delta' + (lastHere.ok ? '' : ' neg')}>{lastHere.ok ? '+' + (lastHere.score - (lastHere.bonus || 0)) + (lastHere.bonus ? ` +${lastHere.bonus}` : '') : lastHere.score}</span>}
@@ -137,7 +139,7 @@ export default function GameView({ cfg, onExit, onAgain, onRecorded }) {
       </section>
 
       <form className={'dock' + (myTurn ? ' on' : '')} onSubmit={submit}>
-        <p className={'msg' + (msg ? ' show' : '')} key={shake} role="alert">{msg || (myTurn ? ERR.chain(game.getSnapshot()) : ' ')}</p>
+        <p className={'msg' + (msg ? ' show' : '')} key={shake} role="alert">{msg || (myTurn ? ERR.chain(s) : ' ')}</p>
         <div className="row">
           <input
             ref={input} className="text big-input" value={text} onChange={(e) => setText(e.target.value)}

@@ -36,6 +36,7 @@ export class Game {
       ...prev,
       rounds: this.cfg.rounds,
       mode: this.mode,
+      opts: this.opts,
       seq: this.seq,
       turn: this.turn,
       players: Object.fromEntries(Object.entries(this.players).map(([k, v]) => [k, { ...v }])),
@@ -173,6 +174,15 @@ export class Game {
     let pv = null, r = 0;
     rank.forEach((p, i) => { if (p.score !== pv) r = i; p.rank = r; pv = p.score; });
     this.emit({ phase: 'over', ranking: rank.map((p) => ({ ...p })) });
+  }
+
+  /** 멀티플레이: 나간 사람의 자리를 봇이 이어받는다 */
+  replaceWithBot(pid) {
+    const p = this.players[pid];
+    if (!p || p.bot) return;
+    p.bot = true; p.level = 2; p.name = p.name + ' (봇)';
+    this.emit({});
+    if (this.s.phase === 'turn' && this.current === pid) this.readyRobot(p);
   }
 
   /* ---------- 봇 (원본 readyRobot) ---------- */

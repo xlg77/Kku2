@@ -3,7 +3,11 @@
 [JJoriping/KKuTu](https://github.com/JJoriping/KKuTu) 의 클래식 규칙(끝말잇기·쿵쿵따·앞말잇기·영어 끝말잇기/3글자), 점수식, 봇 AI, 단어 DB를
 브라우저에서 돌아가도록 옮긴 **정적 웹앱**입니다. 서버·DB 없이 GitHub Pages 에서 동작하며, 봇과 대전합니다.
 
-> GitHub Pages 는 정적 호스팅이라 다른 사람과의 실시간 멀티플레이(WebSocket 서버)는 불가능합니다.
+## 멀티플레이
+서버 없이 Supabase Realtime(Broadcast + Presence)만으로 동작합니다. (`src/multi/room.js`)
+- 방 목록: 방장이 `kkutu-lobby` 채널 Presence 에 방 정보를 올림 (방장이 나가면 자동으로 사라짐)
+- 게임: 방장의 브라우저가 게임 엔진을 돌리고 참가자는 단어를 보내 상태를 받음. 방장이 나가면 방이 닫히고, 참가자가 나가면 봇이 자리를 이어받음.
+- 멀티 판은 랭킹/전적에 반영하지 않음 (방장이 점수를 조작할 수 있는 구조라서).
 
 ## 배포
 1. 이 폴더를 GitHub 저장소(`main` 브랜치)에 push
