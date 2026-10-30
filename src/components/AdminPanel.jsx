@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { parseWords } from '../engine/customWords.js';
-import { countCustomWords, uploadCustomWords, deleteCustomWord } from '../auth.js';
+import { countCustomWords, uploadCustomWords, deleteCustomWord, importFromRepo } from '../auth.js';
 
 export default function AdminPanel() {
   const [text, setText] = useState('');
@@ -29,6 +29,15 @@ export default function AdminPanel() {
     setStatus(`✅ ${parsed.rows.length}개 올렸어요. 새 게임부터 반영돼요`);
     setText(''); refresh();
   }
+  async function importRepo() {
+    if (!confirm('GitHub 저장소의 기본 사전(한국어·영어)을 DB에 가져올까요? 1~2분 걸려요.')) return;
+    setBusy(true);
+    for (const lang of ['ko', 'en']) {
+      const err = await importFromRepo(lang, (n, t) => setStatus(`저장소에서 가져오는 중… ${lang === 'ko' ? '한국어' : '영어'} ${n}/${t}`));
+      if (err) { setBusy(false); return setStatus('⚠️ 실패: ' + err); }
+    }
+    setBusy(false); setStatus('✅ 저장소 사전을 가져왔어요. 새 멀티 게임부터 반영돼요');
+  }
   async function remove(e) {
     e.preventDefault();
     const w = del.trim().toLowerCase();
@@ -42,6 +51,7 @@ export default function AdminPanel() {
     <section className="panel admin">
       <h2>🔧 관리자: 단어 올리기 <small>추가 단어 {total ?? '?'}개</small></h2>
       <p className="note">한 줄에 하나씩 붙여넣거나 파일(txt/csv/tsv)을 고르세요. 열을 쓰려면 <code>단어,언어,외래어,어인정,표준</code> 순서(탭 또는 쉼표). 언어·나머지 열은 비워도 돼요.</p>
+      <button className="ghost" type="button" disabled={busy} onClick={importRepo}>📦 GitHub 저장소 기본 사전 가져오기 (빠름)</button>
       <textarea className="text" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'끄투\n프리서버\nkkutu'} spellCheck={false} aria-label="올릴 단어" />
       <div className="admin-row">
         <label className="ghost filebtn">파일 선택<input type="file" accept=".txt,.csv,.tsv,text/plain,text/csv" onChange={onFile} hidden /></label>

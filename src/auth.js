@@ -117,3 +117,14 @@ export async function deleteCustomWord(word) {
   if (r.error) return r.error;
   return r.data.count ? null : '그런 추가 단어가 없어요';
 }
+
+/** GitHub 저장소의 단어 파일(public/data/ko.txt, en.txt 또는 같은 형식의 .txt)을 DB 가 직접 가져온다 */
+export async function importFromRepo(lang, onProgress, path = null) {
+  const STEP = 40000;
+  for (let off = 0; ; off += STEP) {
+    const r = await rpc('kk_admin_import_repo', { p_token: getToken(), p_lang: lang, p_offset: off, p_limit: STEP, p_path: path });
+    if (r.error) return r.error;
+    onProgress && onProgress(Math.min(off + STEP, r.data.total), r.data.total);
+    if (r.data.done) return null;
+  }
+}
