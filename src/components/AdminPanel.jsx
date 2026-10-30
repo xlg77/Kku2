@@ -30,7 +30,7 @@ export default function AdminPanel() {
     setText(''); refresh();
   }
   async function importRepo() {
-    if (!confirm('GitHub 저장소의 기본 사전(한국어·영어)을 DB에 가져올까요? 1~2분 걸려요.')) return;
+    if (!confirm('GitHub 저장소의 기본 사전(한국어·영어)을 DB에 가져올까요? 1분 안팎 걸려요.')) return;
     setBusy(true);
     for (const lang of ['ko', 'en']) {
       const err = await importFromRepo(lang, (n, t) => setStatus(`저장소에서 가져오는 중… ${lang === 'ko' ? '한국어' : '영어'} ${n}/${t}`));

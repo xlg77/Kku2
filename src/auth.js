@@ -120,8 +120,9 @@ export async function deleteCustomWord(word) {
 
 /** GitHub 저장소의 단어 파일(public/data/ko.txt, en.txt 또는 같은 형식의 .txt)을 DB 가 직접 가져온다 */
 export async function importFromRepo(lang, onProgress, path = null) {
-  const STEP = 40000;
-  for (let off = 0; ; off += STEP) {
+  const STEP = 15000;
+  // 0: 파일을 받아 두기, 이후 1부터 STEP 줄씩 처리 (요청 하나가 3초 안에 끝나도록 잘게 나눔)
+  for (let off = 0; ; off = off === 0 ? 1 : off + STEP) {
     const r = await rpc('kk_admin_import_repo', { p_token: getToken(), p_lang: lang, p_offset: off, p_limit: STEP, p_path: path });
     if (r.error) return r.error;
     onProgress && onProgress(Math.min(off + STEP, r.data.total), r.data.total);
