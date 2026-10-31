@@ -136,7 +136,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         <button className="ghost" onClick={toggleMute} aria-label={muted ? '소리 켜기' : '소리 끄기'}>{muted ? '🔇' : '🔊'}</button>
       </header>
 
-      {specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.webp" alt="20글자 단어 성공 특별 이미지" /><strong>20글자 성공!</strong></div></div>}
+      {specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 단어 성공 특별 이미지" /><strong>20글자 성공!</strong></div></div>}
       <TimerBar className="round-bar" label="라운드 남은 시간" since={s.turnAt} total={s.roundTimeLeft} active={s.phase === 'turn'} danger={0.2} />
 
       <section className={'stage' + (roundEnd ? ' boom' : '')} aria-live="polite">
