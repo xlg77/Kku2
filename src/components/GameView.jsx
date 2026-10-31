@@ -26,6 +26,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const [msg, setMsg] = useState('');
   const [text, setText] = useState('');
   const [pendingPrediction, setPendingPrediction] = useState('');
+  const [specialSuccess, setSpecialSuccess] = useState(false);
   const input = useRef(null);
   const histRef = useRef(null);
   const prevLast = useRef(0);
@@ -38,8 +39,24 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   useEffect(() => {
     if (!s || !s.last || s.last.id === prevLast.current) return;
     prevLast.current = s.last.id;
+    if (s.last.ok && typeof s.last.word === 'string' && [...s.last.word].length === 20) {
+      if (!muted) {
+        const sounds = [
+          'HEAVENLY%20JUMPSTYLE%20%28mp3cut.net%29.mp3',
+          'MONTAGEM%20SUPERSONIC%20-%20KHAOS%20x%20JMILTON%20%28LYRICS%29%20%28mp3cut.net%29.mp3',
+          'SPOOKY%202%20%28mp3cut.net%29.mp3',
+          'X-COOL%21%20%28mp3cut.net%29.mp3',
+        ];
+        const audio = new Audio('https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + sounds[Math.floor(Math.random() * sounds.length)]);
+        audio.volume = 0.85;
+        audio.play().catch(() => {});
+      }
+      setSpecialSuccess(true);
+      const timer = setTimeout(() => setSpecialSuccess(false), 2600);
+      return () => clearTimeout(timer);
+    }
     s.last.ok ? sfx.ok() : sfx.boom();
-  }, [s?.last]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [s?.last, muted]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (s?.phase === 'roundReady') sfx.round(); if (s?.phase === 'over') sfx.win(); }, [s?.phase]);
 
   // 공개 구간에서 Enter로 확정한 예측 단어는 내 차례가 서버에 반영된 뒤 제출한다.
@@ -105,7 +122,10 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const roundEnd = s.phase === 'roundEnd';
 
   return (
-    <main className="game">
+    <main className="game" onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()} onKeyDown={(e) => {
+      if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x'].includes(e.key.toLowerCase())) e.preventDefault();
+      if (e.shiftKey && e.key === 'Insert') e.preventDefault();
+    }}>
       <header className="topbar">
         <button className="ghost" onClick={() => { if (confirm('게임을 나갈까요?')) onExit(); }} aria-label="나가기">← 나가기</button>
         <div className="top-info">
@@ -116,6 +136,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         <button className="ghost" onClick={toggleMute} aria-label={muted ? '소리 켜기' : '소리 끄기'}>{muted ? '🔇' : '🔊'}</button>
       </header>
 
+      {specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.webp" alt="20글자 단어 성공 특별 이미지" /><strong>20글자 성공!</strong></div></div>}
       <TimerBar className="round-bar" label="라운드 남은 시간" since={s.turnAt} total={s.roundTimeLeft} active={s.phase === 'turn'} danger={0.2} />
 
       <section className={'stage' + (roundEnd ? ' boom' : '')} aria-live="polite">
@@ -180,6 +201,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
             disabled={s.phase !== 'turn' && s.phase !== 'turnResult'} placeholder={myTurn ? '여기에 단어 입력' : allowPrediction ? '단어를 미리 입력' : s.phase === 'turn' ? `${s.players[curId]?.name} 차례…` : '잠시만요…'}
             autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="send" lang={mode.lang}
             aria-label={myTurn ? '단어 입력' : '예측 단어 입력'}
+            onPaste={(e) => e.preventDefault()} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()}
           />
           <button className="send" type="submit" disabled={(s.phase !== 'turn' && s.phase !== 'turnResult') || !text.trim() || (!myTurn && s.phase !== 'turnResult')}>{myTurn ? '입력' : allowPrediction && s.phase === 'turnResult' ? '예측 발사' : '대기'}</button>
         </div>
