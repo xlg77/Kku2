@@ -105,7 +105,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         void playSpecialAudio().catch((error) => console.error('[Kku2] 20글자 특수 MP3 재생 실패:', error));
       }
       setSpecialSuccess(true);
-      const timer = setTimeout(() => setSpecialSuccess(false), 2600);
+      const timer = setTimeout(() => setSpecialSuccess(false), 4000);
       return () => clearTimeout(timer);
     }
     s.last.ok ? sfx.ok() : sfx.boom();
@@ -169,7 +169,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const chain = s.chain || [];
   const recent = chain.slice(-6);
 
-  if (s.phase === 'over') return <Result s={s} meId={meId} record={record} onExit={onExit} onAgain={onAgain} againLabel={againLabel} onRecorded={onRecorded} />;
+  if (s.phase === 'over') return <><Result s={s} meId={meId} record={record} onExit={onExit} onAgain={onAgain} againLabel={againLabel} onRecorded={onRecorded} />{specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 단어 성공 특별 이미지" /><strong>20글자 성공!</strong></div></div>}</>;
 
   const showChar = s.phase !== 'idle' && s.phase !== 'starting';
   const roundEnd = s.phase === 'roundEnd';
