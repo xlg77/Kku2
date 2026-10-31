@@ -298,7 +298,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         {allowPrediction && pendingPrediction && <p className="prediction-note">⚡ 예측 확정: {pendingPrediction} · 내 차례를 기다리는 중</p>}
         {activeOpts.length > 0 && <p className="rules">{activeOpts.join(' · ')}</p>}
       </form>
-    </main>
+    </main></>
   );
 }
 
