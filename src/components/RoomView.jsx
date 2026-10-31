@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { MODES, BOT_LEVELS } from '../engine/rules.js';
 import SettingsFields from './SettingsFields.jsx';
 import GameView from './GameView.jsx';
+import { unlockAudio } from '../sfx.js';
 
 export default function RoomView({ session, meId, onLeave }) {
   const st = useSyncExternalStore(session.subscribe, session.getState);
@@ -28,7 +29,7 @@ export default function RoomView({ session, meId, onLeave }) {
   const s = st.settings;
   const mode = MODES[s.mode];
   const total = st.members.length + Math.min(s.bots, st.max - st.members.length);
-  const start = async () => { setStarting(true); try { await session.startGame(); } finally { setStarting(false); } };
+  const start = async () => { void unlockAudio().catch((error) => console.warn('[Kku2] 방 게임 시작 시 오디오 활성화 실패:', error)); setStarting(true); try { await session.startGame(); } finally { setStarting(false); } };
 
   return (
     <main className="lobby">
