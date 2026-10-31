@@ -101,7 +101,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
     prevLast.current = eventKey;
     // 서버가 last.word를 생략하면 갱신된 chain의 마지막 단어를 사용한다.
     const successfulWord = eventWord;
-    if (s.last.ok && typeof successfulWord === 'string' && Array.from(successfulWord.trim()).length === 20) {
+    if (s.last.ok && typeof successfulWord === 'string' && Array.from(successfulWord.trim()).length >= 20) {
       if (!muted) {
         // 대체 효과음 없이 저장소의 MP3만 재생한다. 로드/재생 오류는 콘솔에 남긴다.
         void playSpecialAudio().catch((error) => console.error('[Kku2] 20글자 특수 MP3 재생 실패:', error));
@@ -171,7 +171,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const chain = s.chain || [];
   const recent = chain.slice(-6);
 
-  if (s.phase === 'over') return <><Result s={s} meId={meId} record={record} onExit={onExit} onAgain={onAgain} againLabel={againLabel} onRecorded={onRecorded} />{specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 단어 성공 특별 이미지" /><strong>20글자 성공!</strong></div></div>}</>;
+  if (s.phase === 'over') return <><Result s={s} meId={meId} record={record} onExit={onExit} onAgain={onAgain} againLabel={againLabel} onRecorded={onRecorded} />{specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 이상 단어 성공 특별 이미지" /><strong>20글자 이상 성공!</strong></div></div>}</>;
 
   const showChar = s.phase !== 'idle' && s.phase !== 'starting';
   const roundEnd = s.phase === 'roundEnd';
@@ -191,7 +191,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         <button className="ghost" onClick={toggleMute} aria-label={muted ? '소리 켜기' : '소리 끄기'}>{muted ? '🔇' : '🔊'}</button>
       </header>
 
-      {specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 단어 성공 특별 이미지" /><strong>20글자 성공!</strong></div></div>}
+      {specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 이상 단어 성공 특별 이미지" /><strong>20글자 이상 성공!</strong></div></div>}
       <TimerBar className="round-bar" label="라운드 남은 시간" since={s.turnAt} total={s.roundTimeLeft} active={s.phase === 'turn'} danger={0.2} />
 
       <section className={'stage' + (roundEnd ? ' boom' : '')} aria-live="polite">
