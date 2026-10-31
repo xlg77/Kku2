@@ -100,10 +100,17 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const [pendingPrediction, setPendingPrediction] = useState('');
   const [specialSuccess, setSpecialSuccess] = useState(false);
   const [specialShake, setSpecialShake] = useState(false);
+  const specialSuccessTimer = useRef(null);
   const input = useRef(null);
   const histRef = useRef(null);
   const prevLast = useRef(0);
   const mode = MODES[s?.mode || 'KSH'];
+
+  // 화면이 전환되거나 컴포넌트가 사라질 때 예약된 해골 표시 타이머를 정리한다.
+  useEffect(() => () => {
+    if (specialSuccessTimer.current) window.clearTimeout(specialSuccessTimer.current);
+    specialSuccessTimer.current = null;
+  }, []);
 
   // 사용자의 첫 클릭/터치/키 입력 안에서 Web Audio를 활성화하고 MP3를 미리 불러온다.
   useEffect(() => {
@@ -141,8 +148,11 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         });
       }
       setSpecialSuccess(true);
-      const timer = setTimeout(() => setSpecialSuccess(false), 4000);
-      return () => clearTimeout(timer);
+      if (specialSuccessTimer.current) clearTimeout(specialSuccessTimer.current);
+      specialSuccessTimer.current = window.setTimeout(() => {
+        setSpecialSuccess(false);
+        specialSuccessTimer.current = null;
+      }, 4000);
     }
     s.last.ok ? sfx.ok() : sfx.boom();
   }, [s?.last, muted]); // eslint-disable-line react-hooks/exhaustive-deps
