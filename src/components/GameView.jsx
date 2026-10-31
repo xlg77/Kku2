@@ -4,8 +4,49 @@ import TimerBar from './TimerBar.jsx';
 import Result from './Result.jsx';
 import { sfx, isMuted, setMuted } from '../sfx.js';
 
-let unlockedAudio = null;
-const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+let specialAudioContext = null;
+let specialAudioBuffers = null;
+let specialAudioLoading = null;
+const SPECIAL_SOUNDS = [
+  'HEAVENLY%20JUMPSTYLE%20%28mp3cut.net%29.mp3',
+  'MONTAGEM%20SUPERSONIC%20-%20KHAOS%20x%20JMILTON%20%28LYRICS%29%20%28mp3cut.net%29.mp3',
+  'SPOOKY%202%20%28mp3cut.net%29.mp3',
+  'X-COOL%21%20%28mp3cut.net%29.mp3',
+];
+
+function unlockSpecialAudio() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    specialAudioContext ||= new AudioContextClass();
+    if (specialAudioContext.state === 'suspended') void specialAudioContext.resume();
+    if (!specialAudioBuffers && !specialAudioLoading) {
+      specialAudioLoading = Promise.all(SPECIAL_SOUNDS.map(async (name) => {
+        const response = await fetch('https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + name, { mode: 'cors', cache: 'force-cache' });
+        if (!response.ok) throw new Error('MP3 HTTP ' + response.status + ': ' + name);
+        return specialAudioContext.decodeAudioData(await response.arrayBuffer());
+      })).then((buffers) => { specialAudioBuffers = buffers; return buffers; })
+        .catch((error) => { specialAudioLoading = null; console.warn('[Kku2] 특수 MP3 사전 로드 실패:', error); throw error; });
+    }
+  } catch (error) {
+    console.warn('[Kku2] 오디오 초기화 실패:', error);
+  }
+}
+
+async function playSpecialAudio() {
+  unlockSpecialAudio();
+  if (!specialAudioContext) throw new Error('Web Audio를 지원하지 않는 브라우저예요.');
+  if (specialAudioContext.state === 'suspended') await specialAudioContext.resume();
+  const buffers = specialAudioBuffers || await specialAudioLoading;
+  if (specialAudioContext.state === 'suspended') await specialAudioContext.resume();
+  const buffer = buffers[Math.floor(Math.random() * buffers.length)];
+  const source = specialAudioContext.createBufferSource();
+  const gain = specialAudioContext.createGain();
+  source.buffer = buffer;
+  gain.gain.value = 0.85;
+  source.connect(gain).connect(specialAudioContext.destination);
+  source.start(0);
+}
 
 const ERR = {
   timeout: () => '응답이 없어요. 다시 시도해주세요',
@@ -35,20 +76,9 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const prevLast = useRef(0);
   const mode = MODES[s?.mode || 'KSH'];
 
-  // 첫 실제 입력/터치로 브라우저 오디오 재생 권한을 확보한다.
+  // 사용자의 첫 클릭/터치/키 입력 안에서 Web Audio를 활성화하고 MP3를 미리 불러온다.
   useEffect(() => {
-    const unlock = () => {
-      if (unlockedAudio) return;
-      const silent = new Audio(SILENT_WAV);
-      silent.volume = 0;
-      const started = silent.play();
-      if (started?.then) started.then(() => {
-        silent.pause();
-        silent.currentTime = 0;
-        silent.volume = 0.85;
-        unlockedAudio = silent;
-      }).catch(() => {});
-    };
+    const unlock = () => unlockSpecialAudio();
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
     window.addEventListener('keydown', unlock, { once: true });
     return () => {
@@ -62,26 +92,17 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
 
   // 효과음
   useEffect(() => {
-    if (!s || !s.last || s.last.id === prevLast.current) return;
-    prevLast.current = s.last.id;
-    // 멀티플레이 서버 스냅샷에 last.word가 빠져도 chain의 마지막 성공 단어로 판정한다.
+    if (!s || !s.last) return;
+    // 서버가 id를 생략하는 경우에도 마지막 성공 이벤트를 구분한다.
+    const eventKey = s.last.id ?? [s.last.pid, s.last.word ?? s.chain?.[s.chain.length - 1] ?? '', s.last.score, s.last.ok, s.phase].join('|');
+    if (eventKey === prevLast.current) return;
+    prevLast.current = eventKey;
+    // 서버가 last.word를 생략하면 갱신된 chain의 마지막 단어를 사용한다.
     const successfulWord = typeof s.last.word === 'string' ? s.last.word : (s.last.ok ? s.chain?.[s.chain.length - 1] : '');
-    if (s.last.ok && typeof successfulWord === 'string' && Array.from(successfulWord).length === 20) {
+    if (s.last.ok && typeof successfulWord === 'string' && Array.from(successfulWord.trim()).length === 20) {
       if (!muted) {
-        const sounds = [
-          'HEAVENLY%20JUMPSTYLE%20%28mp3cut.net%29.mp3',
-          'MONTAGEM%20SUPERSONIC%20-%20KHAOS%20x%20JMILTON%20%28LYRICS%29%20%28mp3cut.net%29.mp3',
-          'SPOOKY%202%20%28mp3cut.net%29.mp3',
-          'X-COOL%21%20%28mp3cut.net%29.mp3',
-        ];
-        const audio = unlockedAudio || new Audio();
-        audio.src = 'https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + sounds[Math.floor(Math.random() * sounds.length)];
-        audio.volume = 0.85;
-        audio.play().catch((error) => {
-          console.warn('[Kku2] 특수 효과음 재생 실패:', error);
-          // 브라우저가 원격 MP3를 차단한 경우에도 성공 효과음은 들리게 한다.
-          sfx.win();
-        });
+        // 대체 효과음 없이 저장소의 MP3만 재생한다. 로드/재생 오류는 콘솔에 남긴다.
+        void playSpecialAudio().catch((error) => console.error('[Kku2] 20글자 특수 MP3 재생 실패:', error));
       }
       setSpecialSuccess(true);
       const timer = setTimeout(() => setSpecialSuccess(false), 2600);
