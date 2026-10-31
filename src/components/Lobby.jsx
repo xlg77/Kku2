@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BOT_NAMES } from '../engine/names.js';
 import { load, save } from '../storage.js';
 import Account from './Account.jsx';
@@ -18,6 +18,12 @@ export const loadSettings = () => {
 
 export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersion }) {
   const [s, setS] = useState(loadSettings);
+  useEffect(() => {
+    const unlock = () => { void unlockAudio().catch(() => {}); };
+    window.addEventListener('pointerdown', unlock, { once: true, passive: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+  }, []);
   const set = (patch) => setS((p) => ({ ...p, ...patch }));
 
   function go(e) {
