@@ -82,7 +82,8 @@ export class RoomSession {
   schedule() {
     if (this.dead) return;
     const playing = this.s.phase === 'playing';
-    this.timer = setTimeout(() => this.tick(), playing ? 600 : 1500);
+    const resultWindow = this.store.getSnapshot()?.phase === 'turnResult';
+    this.timer = setTimeout(() => this.tick(), playing ? (resultWindow ? 200 : 600) : 1500);
   }
   async tick() {
     if (this.dead) return;
