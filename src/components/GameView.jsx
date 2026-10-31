@@ -58,7 +58,7 @@ function unlockSpecialAudio() {
   }
 }
 
-async function playSpecialAudio() {
+async function playSpecialAudio(onStart) {
   unlockSpecialAudio();
   if (!specialAudioContext) throw new Error('Web Audio를 지원하지 않는 브라우저예요.');
   await unlockAudio();
@@ -71,7 +71,9 @@ async function playSpecialAudio() {
   source.buffer = buffer;
   gain.gain.value = 0.85;
   source.connect(gain).connect(specialAudioContext.destination);
+  onStart?.();
   source.start(0);
+  return buffer.duration;
 }
 
 const ERR = {
@@ -97,6 +99,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const [text, setText] = useState('');
   const [pendingPrediction, setPendingPrediction] = useState('');
   const [specialSuccess, setSpecialSuccess] = useState(false);
+  const [specialShake, setSpecialShake] = useState(false);
   const input = useRef(null);
   const histRef = useRef(null);
   const prevLast = useRef(0);
@@ -130,7 +133,12 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
     if (s.last.ok && typeof successfulWord === 'string' && Array.from(successfulWord.trim()).length >= 20) {
       if (!muted) {
         // 대체 효과음 없이 저장소의 MP3만 재생한다. 로드/재생 오류는 콘솔에 남긴다.
-        void playSpecialAudio().catch((error) => console.error('[Kku2] 20글자 특수 MP3 재생 실패:', error));
+        void playSpecialAudio(() => setSpecialShake(true)).then((duration) => {
+          window.setTimeout(() => setSpecialShake(false), Math.max(500, duration * 1000));
+        }).catch((error) => {
+          setSpecialShake(false);
+          console.error('[Kku2] 20글자 특수 MP3 재생 실패:', error);
+        });
       }
       setSpecialSuccess(true);
       const timer = setTimeout(() => setSpecialSuccess(false), 4000);
@@ -197,13 +205,13 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const chain = s.chain || [];
   const recent = chain.slice(-6);
 
-  if (s.phase === 'over') return <><Result s={s} meId={meId} record={record} onExit={onExit} onAgain={onAgain} againLabel={againLabel} onRecorded={onRecorded} />{specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 이상 단어 성공 특별 이미지" /><strong>20글자 이상 성공!</strong></div></div>}</>;
+  if (s.phase === 'over') return <><style>{`@keyframes kku2-special-shake { 0%,100% { transform: translate3d(0,0,0) rotate(0); } 8% { transform: translate3d(-12px,7px,0) rotate(-1.2deg); } 16% { transform: translate3d(13px,-8px,0) rotate(1.3deg); } 24% { transform: translate3d(-14px,-5px,0) rotate(-1.4deg); } 32% { transform: translate3d(12px,9px,0) rotate(1.2deg); } 40% { transform: translate3d(-10px,6px,0) rotate(-1deg); } 48% { transform: translate3d(11px,-7px,0) rotate(1deg); } 56% { transform: translate3d(-9px,-5px,0) rotate(-.8deg); } 64% { transform: translate3d(8px,6px,0) rotate(.8deg); } 72% { transform: translate3d(-6px,4px,0) rotate(-.5deg); } 80% { transform: translate3d(5px,-4px,0) rotate(.4deg); } 90% { transform: translate3d(-3px,2px,0); } } .kku2-special-shaking { animation: kku2-special-shake .42s infinite; transform-origin: center; will-change: transform; } @media (prefers-reduced-motion: reduce) { .kku2-special-shaking { animation: none !important; } }`}</style><div className={specialShake ? 'kku2-special-shaking' : ''}><Result s={s} meId={meId} record={record} onExit={onExit} onAgain={onAgain} againLabel={againLabel} onRecorded={onRecorded} /></div>{specialSuccess && <div className="special-success" role="status" aria-live="assertive"><div className="special-success-card"><img src="/Kku2/special-success.svg" alt="20글자 이상 단어 성공 특별 이미지" /><strong>20글자 이상 성공!</strong></div></div>}</>;
 
   const showChar = s.phase !== 'idle' && s.phase !== 'starting';
   const roundEnd = s.phase === 'roundEnd';
 
   return (
-    <main className="game" onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()} onKeyDown={(e) => {
+    <><style>{`@keyframes kku2-special-shake { 0%,100% { transform: translate3d(0,0,0) rotate(0); } 8% { transform: translate3d(-12px,7px,0) rotate(-1.2deg); } 16% { transform: translate3d(13px,-8px,0) rotate(1.3deg); } 24% { transform: translate3d(-14px,-5px,0) rotate(-1.4deg); } 32% { transform: translate3d(12px,9px,0) rotate(1.2deg); } 40% { transform: translate3d(-10px,6px,0) rotate(-1deg); } 48% { transform: translate3d(11px,-7px,0) rotate(1deg); } 56% { transform: translate3d(-9px,-5px,0) rotate(-.8deg); } 64% { transform: translate3d(8px,6px,0) rotate(.8deg); } 72% { transform: translate3d(-6px,4px,0) rotate(-.5deg); } 80% { transform: translate3d(5px,-4px,0) rotate(.4deg); } 90% { transform: translate3d(-3px,2px,0); } } .kku2-special-shaking { animation: kku2-special-shake .42s infinite; transform-origin: center; will-change: transform; } @media (prefers-reduced-motion: reduce) { .kku2-special-shaking { animation: none !important; } }`}</style><main className={'game' + (specialShake ? ' kku2-special-shaking' : '')} onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onPaste={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()} onKeyDown={(e) => {
       if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x'].includes(e.key.toLowerCase())) e.preventDefault();
       if (e.shiftKey && e.key === 'Insert') e.preventDefault();
     }}>
