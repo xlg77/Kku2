@@ -1,5 +1,5 @@
-// 서버 권위 멀티플레이: 방·차례·판정·점수는 전부 Supabase DB 함수(kk_room_*)가 처리한다.
-// 클라이언트는 입력을 보내고(kk_room_submit) 주기적으로 상태를 받아(kk_room_tick) 그리기만 한다.
+// 서버 권위 멀티플레이: 방·차례·판정·점수·봇은 Supabase DB 함수(kk_room_*)가 처리한다.
+// 방 변경은 Realtime Broadcast로 즉시 알리고, tick은 게임 시계/접속 상태를 유지하는 보조 heartbeat로 쓴다.
 import { supabase } from '../supabase.js';
 import { getToken } from '../auth.js';
 
@@ -26,16 +26,50 @@ async function call(fn, args) {
   return { data };
 }
 
-/** 방 목록 (3초마다 갱신) */
+/** 방 목록은 Broadcast 알림으로 즉시 갱신하고, 연결 복구용으로 12초마다 확인한다. */
 export class LobbyNet {
-  constructor() { this.rooms = []; this.cbs = new Set(); this.timer = null; }
-  start() { this.poll(); this.timer = setInterval(() => this.poll(), 3000); }
+  constructor() {
+    this.rooms = [];
+    this.cbs = new Set();
+    this.timer = null;
+    this.channel = null;
+    this.polling = false;
+    this.dead = false;
+  }
+  start() {
+    if (this.channel || this.dead) return;
+    this.dead = false;
+    this.channel = supabase
+      .channel('kku2:lobby')
+      .on('broadcast', { event: 'room_changed' }, () => this.poll())
+      .subscribe();
+    this.poll();
+    this.timer = setInterval(() => this.poll(), 12000);
+  }
   async poll() {
-    const { data } = await supabase.rpc('kk_list_rooms');
-    if (Array.isArray(data)) { this.rooms = data; this.cbs.forEach((f) => f(this.rooms)); }
+    if (this.polling || this.dead) return;
+    this.polling = true;
+    try {
+      const { data, error } = await supabase.rpc('kk_list_rooms');
+      if (!error && !this.dead && Array.isArray(data)) {
+        this.rooms = data;
+        this.cbs.forEach((f) => f(this.rooms));
+      }
+    } catch {
+      // Realtime 및 다음 heartbeat에서 자동으로 다시 동기화한다.
+    } finally {
+      this.polling = false;
+    }
   }
   watch(f) { this.cbs.add(f); f(this.rooms); return () => this.cbs.delete(f); }
-  stop() { clearInterval(this.timer); this.cbs.clear(); }
+  stop() {
+    this.dead = true;
+    clearInterval(this.timer);
+    this.timer = null;
+    this.cbs.clear();
+    if (this.channel) supabase.removeChannel(this.channel);
+    this.channel = null;
+  }
 }
 
 export async function createRoom(name, max, settings) {
@@ -49,12 +83,22 @@ export async function joinRoom(code) {
 
 export class RoomSession {
   constructor({ room, me }) {
-    this.me = me; this.code = room.code;
+    this.me = me;
+    this.code = room.code;
     this.store = new Store(null);
     this.l = new Set();
     this.s = { phase: 'waiting', name: '', max: MAX_PLAYERS, settings: room.settings, members: [], hostId: room.host_id, chat: [], closed: '' };
-    this.version = -1; this.dead = false; this.busy = false; this.offset = 0;
+    this.version = -1;
+    this.dead = false;
+    this.busy = false;
+    this.offset = 0;
+    this.timer = null;
+    this.channel = null;
     this.apply(room, Date.now());
+    this.channel = supabase
+      .channel(`kku2:room:${this.code}`)
+      .on('broadcast', { event: 'room_changed' }, () => this.tick())
+      .subscribe();
     this.schedule();
   }
   get isHost() { return this.s.hostId === this.me.id; }
@@ -66,49 +110,82 @@ export class RoomSession {
   apply(room, sentAt) {
     if (!room || this.dead) return;
     const recvAt = Date.now();
-    this.offset = room.now - (sentAt + recvAt) / 2; // 서버 시계 - 내 시계
+    this.offset = room.now - (sentAt + recvAt) / 2;
     if (room.version === this.version) return;
     this.version = room.version;
     const chat = (room.chat || []).map((c) => ({ id: c.from === this.me.nickname ? this.me.id : 'x' + c.id, key: c.id, nickname: c.from, text: c.text }));
-    this.set({ phase: room.status, name: room.name, max: room.max, settings: room.settings, members: room.members.map((m) => ({ id: m.id, nickname: m.nickname })), hostId: room.host_id, chat });
+    this.set({
+      phase: room.status, name: room.name, max: room.max, settings: room.settings,
+      members: room.members.map((m) => ({ id: m.id, nickname: m.nickname })),
+      hostId: room.host_id, chat,
+    });
     const st = room.state;
     if (st && room.status !== 'waiting') {
       const snap = { ...st };
       if (snap.turnAt) snap.turnAt = snap.turnAt - this.offset;
       this.store.set(snap);
-    } else if (this.store.getSnapshot()) this.store.set(null);
+    } else if (this.store.getSnapshot()) {
+      this.store.set(null);
+    }
   }
 
   schedule() {
     if (this.dead) return;
+    clearTimeout(this.timer);
     const playing = this.s.phase === 'playing';
     const resultWindow = this.store.getSnapshot()?.phase === 'turnResult';
-    this.timer = setTimeout(() => this.tick(), playing ? (resultWindow ? 200 : 600) : 1500);
+    // 제출 직후 1.25초 예측 공개 구간은 빠르게 확인하고, 평소에는 heartbeat 빈도를 낮춘다.
+    const delay = playing ? (resultWindow ? 250 : 2200) : 7000;
+    this.timer = setTimeout(() => this.tick(), delay);
   }
   async tick() {
-    if (this.dead) return;
+    if (this.dead || this.busy) return;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.busy = true;
     const sent = Date.now();
-    const r = await call('kk_room_tick', { p_code: this.code });
-    if (this.dead) return;
-    if (r.error) {
-      if (r.code === 'not_found' || r.code === 'not_member' || r.code === 'unauthorized') { this.close(r.error); return; }
-    } else this.apply(r.data.room, sent);
-    this.schedule();
+    try {
+      const r = await call('kk_room_tick', { p_code: this.code });
+      if (this.dead) return;
+      if (r.error) {
+        if (r.code === 'not_found' || r.code === 'not_member' || r.code === 'unauthorized') {
+          this.close(r.error);
+          return;
+        }
+      } else {
+        this.apply(r.data.room, sent);
+      }
+    } finally {
+      this.busy = false;
+      this.schedule();
+    }
   }
-  close(reason) { this.dead = true; clearTimeout(this.timer); this.set({ closed: reason }); this.dead = true; }
+  close(reason) {
+    if (this.dead) return;
+    this.dead = true;
+    clearTimeout(this.timer);
+    this.timer = null;
+    if (this.channel) supabase.removeChannel(this.channel);
+    this.channel = null;
+    this.set({ closed: reason });
+  }
 
   async act(fn, args) {
     const sent = Date.now();
     const r = await call(fn, { p_code: this.code, ...args });
     if (r.error) return { ok: false, error: r.error };
-    if (r.data.room) { this.version = -1; this.apply(r.data.room, sent); }
+    if (r.data.room) {
+      this.version = -1;
+      this.apply(r.data.room, sent);
+      this.schedule();
+    }
     return { ok: r.data.ok !== false, code: r.data.code };
   }
   async updateSettings(patch) {
     if (!this.isHost || this.s.phase !== 'waiting') return;
     const settings = { ...this.s.settings, ...patch };
     settings.bots = Math.max(0, Math.min(MAX_PLAYERS - this.s.members.length, settings.bots));
-    this.set({ settings }); // 즉시 반영, 서버 응답으로 확정
+    this.set({ settings });
     await this.act('kk_room_settings', { p_settings: settings });
   }
   canStart() {
@@ -125,7 +202,11 @@ export class RoomSession {
   };
   leave() {
     if (this.dead) { this.l.clear(); return; }
-    this.dead = true; clearTimeout(this.timer);
+    this.dead = true;
+    clearTimeout(this.timer);
+    this.timer = null;
+    if (this.channel) supabase.removeChannel(this.channel);
+    this.channel = null;
     supabase.rpc('kk_room_leave', { p_token: getToken(), p_code: this.code }).then(() => {}, () => {});
     this.l.clear();
   }
