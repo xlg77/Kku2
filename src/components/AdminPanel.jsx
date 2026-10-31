@@ -32,13 +32,25 @@ export default function AdminPanel() {
   const [dLang, setDLang] = useState('ko');
   const [dFmt, setDFmt] = useState('dict');
   const [dReplace, setDReplace] = useState(true);
+  async function readDictText(file) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let decoded;
+    if (bytes[0] === 0xff && bytes[1] === 0xfe) decoded = new TextDecoder('utf-16le').decode(bytes.subarray(2));
+    else if (bytes[0] === 0xfe && bytes[1] === 0xff) decoded = new TextDecoder('utf-16be').decode(bytes.subarray(2));
+    else {
+      try { decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+      catch { decoded = new TextDecoder('euc-kr').decode(bytes); }
+    }
+    return decoded.replace(/^\uFEFF/, '').replace(/\u0000/g, '');
+  }
   async function onDictFile(e) {
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
+    if (!/\.txt$/i.test(f.name)) return setStatus('⚠️ 사전 파일은 .txt 형식만 선택할 수 있어요.');
     if (dReplace && !confirm(`${dLang === 'ko' ? '한국어' : '영어'} 사전을 이 파일 내용으로 통째로 바꿀까요? 기존 ${dLang === 'ko' ? '한국어' : '영어'} 단어는 모두 지워져요.`)) return;
     setBusy(true); setStatus('파일 읽는 중…');
-    const result = await putDictFile(dLang, await f.text(), dFmt, dReplace, (n, t) => setStatus(`DB에 올리는 중… ${n}/${t}줄`));
+    const result = await putDictFile(dLang, await readDictText(f), dFmt, dReplace, (n, t) => setStatus(`DB에 올리는 중… ${n}/${t}줄`));
     setBusy(false);
     if (typeof result === 'string') return setStatus('⚠️ 실패: ' + result);
     setStatus(`✅ 멀티플레이 사전에 ${result.count.toLocaleString()}개 등록했어요 (유효 ${result.valid.toLocaleString()}개 / 전체 ${result.total.toLocaleString()}줄). 새 게임부터 반영돼요.`);
