@@ -6,6 +6,7 @@ import Leaderboard from './Leaderboard.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import SettingsFields from './SettingsFields.jsx';
 import { MODES, cleanOpts } from '../engine/rules.js';
+import { unlockAudio } from '../sfx.js';
 
 export const defaultSettings = { mode: 'KSH', rounds: 3, time: 60, bots: 2, level: 2, opts: { manner: true, mission: true, injeong: false, loanword: false, strict: false } };
 export const loadSettings = () => {
@@ -21,6 +22,7 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
 
   function go(e) {
     e.preventDefault();
+    void unlockAudio().catch((error) => console.warn('[Kku2] 시작 시 오디오 활성화 실패:', error));
     if (loading) return;
     save('settings', s);
     const names = [...BOT_NAMES].sort(() => Math.random() - 0.5).slice(0, s.bots);
@@ -42,7 +44,7 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
 
       <Account auth={auth} />
 
-      <button className="go multi-go" type="button" onClick={() => { save('settings', s); onMulti(); }} disabled={!auth.profile}>🌐 멀티플레이 (친구와 함께)</button>
+      <button className="go multi-go" type="button" onClick={() => { void unlockAudio().catch((error) => console.warn('[Kku2] 멀티 시작 시 오디오 활성화 실패:', error)); save('settings', s); onMulti(); }} disabled={!auth.profile}>🌐 멀티플레이 (친구와 함께)</button>
       <p className="or">또는 봇과 연습하기</p>
 
       <form className="panel" onSubmit={go}>
