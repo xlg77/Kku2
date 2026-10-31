@@ -38,9 +38,10 @@ export default function AdminPanel() {
     if (!f) return;
     if (dReplace && !confirm(`${dLang === 'ko' ? '한국어' : '영어'} 사전을 이 파일 내용으로 통째로 바꿀까요? 기존 ${dLang === 'ko' ? '한국어' : '영어'} 단어는 모두 지워져요.`)) return;
     setBusy(true); setStatus('파일 읽는 중…');
-    const err = await putDictFile(dLang, await f.text(), dFmt, dReplace, (n, t) => setStatus(`DB에 올리는 중… ${n}/${t}줄`));
+    const result = await putDictFile(dLang, await f.text(), dFmt, dReplace, (n, t) => setStatus(`DB에 올리는 중… ${n}/${t}줄`));
     setBusy(false);
-    setStatus(err ? '⚠️ 실패: ' + err : '✅ 사전을 올렸어요. 새 멀티 게임부터 반영돼요');
+    if (typeof result === 'string') return setStatus('⚠️ 실패: ' + result);
+    setStatus(`✅ 멀티플레이 사전에 ${result.count.toLocaleString()}개 등록했어요 (유효 ${result.valid.toLocaleString()}개 / 전체 ${result.total.toLocaleString()}줄). 새 게임부터 반영돼요.`);
   }
   async function remove(e) {
     e.preventDefault();
