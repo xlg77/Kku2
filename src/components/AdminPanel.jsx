@@ -30,7 +30,7 @@ export default function AdminPanel() {
     setText(''); refresh();
   }
   const [dLang, setDLang] = useState('ko');
-  const [dFmt, setDFmt] = useState('dict');
+  const [dFmt, setDFmt] = useState('plain');
   const [dReplace, setDReplace] = useState(true);
   async function readDictText(file) {
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -67,7 +67,7 @@ export default function AdminPanel() {
   return (
     <section className="panel admin">
       <h2>🔧 관리자: 단어 올리기 <small>DB 사전 {total ?? '?'}개</small></h2>
-      <p className="note">한 줄에 하나씩 붙여넣거나 파일(txt/csv/tsv)을 고르세요. 열을 쓰려면 <code>단어,언어,외래어,어인정,표준</code> 순서(탭 또는 쉼표). 언어·나머지 열은 비워도 돼요.</p>
+      <p className="note">멀티플레이 사전 파일은 TXT만 지원해요. 일반 단어 목록은 한 줄에 단어 하나씩 저장한 TXT를 선택하세요.</p>
       <div className="admin-dict">
         <h3 className="h2">📚 멀티플레이 사전 통째로 올리기</h3>
         <div className="admin-row">
