@@ -1,5 +1,5 @@
 // 서버 권위 멀티플레이: 방·차례·판정·점수·봇은 Supabase DB 함수(kk_room_*)가 처리한다.
-// 방 변경은 Realtime Broadcast로 즉시 알리고, tick은 게임 시계/접속 상태를 유지하는 보조 heartbeat로 쓴다.
+// DB RPC가 성공한 뒤 변경 알림만 Broadcast로 보내고, tick은 게임 시계/접속 상태용 heartbeat로 쓴다.
 import { supabase } from '../supabase.js';
 import { getToken } from '../auth.js';
 
@@ -18,6 +18,25 @@ const ERRS = {
   unauthorized: '로그인이 만료됐어요. 다시 로그인해주세요', not_member: '방에서 나가졌어요', busy: '잠시 후 다시 해주세요',
 };
 const errMsg = (e) => ERRS[e] || ('오류: ' + e);
+
+/** 공개 채널에는 방 코드/버전만 보낸다. 실제 방 상태는 멤버 검증 RPC로만 읽는다. */
+async function sendRoomBroadcast(topic, payload) {
+  const channel = supabase.channel(topic);
+  try {
+    await channel.send({ type: 'broadcast', event: 'room_changed', payload });
+  } finally {
+    await supabase.removeChannel(channel);
+  }
+}
+function notifyRoomChanged(code, version = null, operation = 'UPDATE') {
+  const payload = { code, version, operation };
+  void Promise.all([
+    sendRoomBroadcast('kku2:lobby', payload),
+    sendRoomBroadcast(`kku2:room:${code}`, payload),
+  ]).catch(() => {
+    // Realtime이 일시적으로 끊겨도 heartbeat가 최신 상태를 다시 가져온다.
+  });
+}
 
 async function call(fn, args) {
   const { data, error } = await supabase.rpc(fn, { p_token: getToken(), ...args });
@@ -74,11 +93,15 @@ export class LobbyNet {
 
 export async function createRoom(name, max, settings) {
   const r = await call('kk_room_create', { p_name: name, p_max: max, p_settings: settings });
-  return r.error ? { error: r.error } : { room: r.data.room };
+  if (r.error) return { error: r.error };
+  notifyRoomChanged(r.data.room.code, r.data.room.version, 'INSERT');
+  return { room: r.data.room };
 }
 export async function joinRoom(code) {
   const r = await call('kk_room_join', { p_code: code });
-  return r.error ? { error: r.error } : { room: r.data.room };
+  if (r.error) return { error: r.error };
+  notifyRoomChanged(r.data.room.code, r.data.room.version, 'UPDATE');
+  return { room: r.data.room };
 }
 
 export class RoomSession {
@@ -97,7 +120,7 @@ export class RoomSession {
     this.apply(room, Date.now());
     this.channel = supabase
       .channel(`kku2:room:${this.code}`)
-      .on('broadcast', { event: 'room_changed' }, () => this.tick())
+      .on('broadcast', { event: 'room_changed' }, () => this.tick(true))
       .subscribe();
     this.schedule();
   }
@@ -136,24 +159,29 @@ export class RoomSession {
     const resultWindow = this.store.getSnapshot()?.phase === 'turnResult';
     // 제출 직후 1.25초 예측 공개 구간은 빠르게 확인하고, 평소에는 heartbeat 빈도를 낮춘다.
     const delay = playing ? (resultWindow ? 250 : 2200) : 7000;
-    this.timer = setTimeout(() => this.tick(), delay);
+    this.timer = setTimeout(() => this.tick(false), delay);
   }
-  async tick() {
+  async tick(fromBroadcast = false) {
     if (this.dead || this.busy) return;
     clearTimeout(this.timer);
     this.timer = null;
     this.busy = true;
     const sent = Date.now();
+    const previousVersion = this.version;
     try {
       const r = await call('kk_room_tick', { p_code: this.code });
       if (this.dead) return;
       if (r.error) {
         if (r.code === 'not_found' || r.code === 'not_member' || r.code === 'unauthorized') {
+          if (r.code === 'not_found') notifyRoomChanged(this.code, null, 'DELETE');
           this.close(r.error);
           return;
         }
       } else {
         this.apply(r.data.room, sent);
+        if (!fromBroadcast && r.data.room?.version !== previousVersion) {
+          notifyRoomChanged(this.code, r.data.room.version, 'UPDATE');
+        }
       }
     } finally {
       this.busy = false;
@@ -172,11 +200,15 @@ export class RoomSession {
 
   async act(fn, args) {
     const sent = Date.now();
+    const previousVersion = this.version;
     const r = await call(fn, { p_code: this.code, ...args });
     if (r.error) return { ok: false, error: r.error };
     if (r.data.room) {
       this.version = -1;
       this.apply(r.data.room, sent);
+      if (r.data.room.version !== previousVersion) {
+        notifyRoomChanged(this.code, r.data.room.version, 'UPDATE');
+      }
       this.schedule();
     }
     return { ok: r.data.ok !== false, code: r.data.code };
@@ -207,7 +239,9 @@ export class RoomSession {
     this.timer = null;
     if (this.channel) supabase.removeChannel(this.channel);
     this.channel = null;
-    supabase.rpc('kk_room_leave', { p_token: getToken(), p_code: this.code }).then(() => {}, () => {});
+    supabase.rpc('kk_room_leave', { p_token: getToken(), p_code: this.code }).then(({ error, data }) => {
+      if (!error && !data?.error) notifyRoomChanged(this.code, null, 'UPDATE');
+    }).catch(() => {});
     this.l.clear();
   }
 }
