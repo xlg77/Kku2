@@ -207,3 +207,9 @@ code { background: color-mix(in srgb, var(--ink) 10%, transparent); padding: 1px
 .chatlog { height: 160px; overflow-y: auto; border: 2.5px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--bg); display: grid; gap: 4px; align-content: start; }
 .chatlog p { margin: 0; word-break: break-word; } .chatlog p.mine b { color: var(--coral); }
 .chat .rename { max-width: none; }
+
+
+/* ---------- 비공개 예측샷 ---------- */
+.dock.predicting .big-input { border-color: var(--sky); background: color-mix(in srgb, var(--sky) 8%, var(--paper)); }
+.dock.predicting .send { background: var(--sky); }
+.prediction-note { margin: 0; text-align: center; color: var(--sky); font-size: 12px; font-weight: 800; }
