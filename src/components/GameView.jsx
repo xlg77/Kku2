@@ -19,7 +19,7 @@ const ERR = {
  * 게임 화면. store(subscribe/getSnapshot)가 주는 스냅샷만 그린다.
  * 혼자 하기: store = Game, 멀티플레이: store = 방장이 보내준 상태. submit(text) → Promise<{ok, code}>
  */
-export default function GameView({ store, meId, submit: submitFn, record, onExit, onAgain, againLabel, onRecorded }) {
+export default function GameView({ store, meId, submit: submitFn, record, onExit, onAgain, againLabel, onRecorded, allowPrediction = false }) {
   const s = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [muted, setM] = useState(isMuted());
   const [shake, setShake] = useState(0);
@@ -41,21 +41,38 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   }, [s?.last]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (s?.phase === 'roundReady') sfx.round(); if (s?.phase === 'over') sfx.win(); }, [s?.phase]);
 
-  // 내 차례가 되면 입력창에 포커스 / 메시지 초기화
+  // 내 차례가 되면 저장해 둔 예측 단어를 즉시 제출한다.
   useEffect(() => {
-    if (myTurn) { setMsg(''); setText(''); input.current?.focus({ preventScroll: true }); }
-  }, [myTurn, s?.turnAt]);
+    if (!myTurn) return;
+    setMsg('');
+    const predicted = allowPrediction ? text.trim() : '';
+    if (predicted) {
+      setText('');
+      sendWord(predicted, true);
+    } else {
+      setText('');
+      input.current?.focus({ preventScroll: true });
+    }
+  }, [myTurn, s?.turnAt]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { histRef.current?.scrollTo({ top: histRef.current.scrollHeight, behavior: 'smooth' }); }, [s?.chain?.length]);
+
+  async function sendWord(word, predicted = false) {
+    const r = await submitFn(word);
+    if (r.ok) { setText(''); setMsg(predicted ? '⚡ 예측샷 성공! 먼저 준비한 단어가 제출됐어요.' : ''); return; }
+    if (r.code === 'empty' || r.code === 'turn' || r.code === 'phase') return;
+    const m = (ERR[r.code] || (() => '사용할 수 없는 단어예요'))(store.getSnapshot() || s);
+    setMsg((predicted ? '예측샷 실패 · ' : '') + m);
+    setShake((n) => n + 1); sfx.bad();
+    if (!predicted) input.current?.select();
+  }
 
   async function submit(e) {
     e.preventDefault();
-    if (!myTurn) return;
-    const r = await submitFn(text);
-    if (r.ok) { setText(''); setMsg(''); return; }
-    if (r.code === 'empty' || r.code === 'turn' || r.code === 'phase') return;
-    const m = (ERR[r.code] || (() => '사용할 수 없는 단어예요'))(store.getSnapshot() || s);
-    setMsg(m); setShake((n) => n + 1); sfx.bad();
-    input.current?.select();
+    if (!myTurn) {
+      if (allowPrediction && text.trim()) setMsg('예측 단어를 저장했어요. 내 차례가 되면 자동 제출돼요.');
+      return;
+    }
+    await sendWord(text);
   }
 
   const toggleMute = () => { setMuted(!muted); setM(!muted); };
@@ -138,17 +155,18 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         })}
       </section>
 
-      <form className={'dock' + (myTurn ? ' on' : '')} onSubmit={submit}>
-        <p className={'msg' + (msg ? ' show' : '')} key={shake} role="alert">{msg || (myTurn ? ERR.chain(s) : ' ')}</p>
+      <form className={'dock' + (myTurn ? ' on' : '') + (allowPrediction && !myTurn && s.phase === 'turn' ? ' predicting' : '')} onSubmit={submit}>
+        <p className={'msg' + (msg ? ' show' : '')} key={shake} role="status">{msg || (myTurn ? ERR.chain(s) : allowPrediction && s.phase === 'turn' ? '상대 차례예요. 다음 단어를 몰래 미리 입력해 두세요.' : ' ')}</p>
         <div className="row">
           <input
-            ref={input} className="text big-input" value={text} onChange={(e) => setText(e.target.value)}
-            disabled={!myTurn} placeholder={myTurn ? '여기에 단어 입력' : s.phase === 'turn' ? `${s.players[curId]?.name} 차례…` : '잠시만요…'}
+            ref={input} className="text big-input" value={text} onChange={(e) => { setText(e.target.value); if (!myTurn) setMsg(''); }}
+            disabled={s.phase !== 'turn'} placeholder={myTurn ? '여기에 단어 입력' : allowPrediction && s.phase === 'turn' ? '예측할 단어를 미리 입력' : s.phase === 'turn' ? `${s.players[curId]?.name} 차례…` : '잠시만요…'}
             autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="send" lang={mode.lang}
-            aria-label="단어 입력"
+            aria-label={myTurn ? '단어 입력' : '예측 단어 입력'}
           />
-          <button className="send" type="submit" disabled={!myTurn || !text.trim()}>입력</button>
+          <button className="send" type="submit" disabled={s.phase !== 'turn' || !text.trim()}>{myTurn ? '입력' : allowPrediction ? '예측 저장' : '입력'}</button>
         </div>
+        {allowPrediction && s.phase === 'turn' && !myTurn && text.trim() && <p className="prediction-note">🔒 예측 단어는 나에게만 보여요 · 내 차례가 되면 자동 제출</p>}
         {activeOpts.length > 0 && <p className="rules">{activeOpts.join(' · ')}</p>}
       </form>
     </main>
