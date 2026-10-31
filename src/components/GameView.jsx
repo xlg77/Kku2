@@ -32,6 +32,17 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const prevLast = useRef(0);
   const mode = MODES[s?.mode || 'KSH'];
 
+  // 첫 실제 입력/터치로 브라우저 오디오 재생 권한을 확보한다.
+  useEffect(() => {
+    const unlock = () => { window.__kku2AudioUnlocked = true; };
+    window.addEventListener('pointerdown', unlock, { once: true, passive: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
   const myTurn = !!s && s.phase === 'turn' && s.seq[s.turn] === meId;
   const curId = s ? s.seq[s.turn] : null;
 
@@ -39,7 +50,9 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   useEffect(() => {
     if (!s || !s.last || s.last.id === prevLast.current) return;
     prevLast.current = s.last.id;
-    if (s.last.ok && typeof s.last.word === 'string' && [...s.last.word].length === 20) {
+    // 멀티플레이 서버 스냅샷에 last.word가 빠져도 chain의 마지막 성공 단어로 판정한다.
+    const successfulWord = typeof s.last.word === 'string' ? s.last.word : (s.last.ok ? s.chain?.[s.chain.length - 1] : '');
+    if (s.last.ok && typeof successfulWord === 'string' && Array.from(successfulWord).length === 20) {
       if (!muted) {
         const sounds = [
           'HEAVENLY%20JUMPSTYLE%20%28mp3cut.net%29.mp3',
@@ -49,7 +62,11 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
         ];
         const audio = new Audio('https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + sounds[Math.floor(Math.random() * sounds.length)]);
         audio.volume = 0.85;
-        audio.play().catch(() => {});
+        audio.play().catch((error) => {
+          console.warn('[Kku2] 특수 효과음 재생 실패:', error);
+          // 브라우저가 원격 MP3를 차단한 경우에도 성공 효과음은 들리게 한다.
+          sfx.win();
+        });
       }
       setSpecialSuccess(true);
       const timer = setTimeout(() => setSpecialSuccess(false), 2600);
