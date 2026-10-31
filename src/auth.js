@@ -120,12 +120,23 @@ export async function deleteCustomWord(word) {
 
 /** 사전 파일 통째로 올리기: 줄 단위로 나눠(요청 하나가 3초 안에 끝나도록) 보낸다. format: 'dict'(기본 사전 형식) | 'plain'(한 줄에 단어 하나) */
 export async function putDictFile(lang, text, format, replace, onProgress) {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const valid = (line) => {
+    if (format === 'plain') return lang === 'ko' ? /^[가-힣]{2,}$/.test(line) : /^[a-z]{2,}$/.test(line);
+    return lang === 'ko' ? /^[가-힣]{2,}[0-9A-Za-z+\-][01][0-9]$/.test(line) : /^[a-z]{2,}[0-9]$/.test(line);
+  };
+  const validCount = lines.filter(valid).length;
+  if (!validCount) return '이 파일에서 등록 가능한 단어를 찾지 못했어요. 언어와 파일 형식을 확인해주세요. 기존 사전은 변경하지 않았어요.';
   const STEP = 12000;
+  let inserted = 0;
   for (let i = 0; i < lines.length; i += STEP) {
-    const r = await rpc('kk_admin_put_words', { p_token: getToken(), p_lang: lang, p_lines: lines.slice(i, i + STEP).join('\n'), p_format: format, p_replace: replace && i === 0 });
+    const chunk = lines.slice(i, i + STEP);
+    if (!chunk.some(valid)) continue;
+    const r = await rpc('kk_admin_put_words', { p_token: getToken(), p_lang: lang, p_lines: chunk.join('\n'), p_format: format, p_replace: replace && i === 0 });
     if (r.error) return r.error;
+    inserted += Number(r.data?.count || 0);
     onProgress && onProgress(Math.min(i + STEP, lines.length), lines.length);
   }
-  return null;
+  if (!inserted) return '서버에 등록된 단어가 0개예요. 파일 형식을 확인해주세요.';
+  return { count: inserted, valid: validCount, total: lines.length };
 }
