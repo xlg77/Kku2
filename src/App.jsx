@@ -6,10 +6,11 @@ import RoomView from './components/RoomView.jsx';
 import AuthScreen from './components/AuthScreen.jsx';
 import { loadDict } from './engine/dict.js';
 import { MODES } from './engine/rules.js';
-import { useAuth, fetchCustomWords } from './auth.js';
+import { useAuth } from './auth.js';
+import { supabase } from './supabase.js';
 import { LobbyNet, RoomSession, createRoom as createRoomRpc, joinRoom as joinRoomRpc } from './multi/room.js';
 
-const dictFor = (lang, onProgress) => loadDict(lang, onProgress, () => fetchCustomWords(lang));
+const dictFor = (lang, onProgress) => loadDict(lang, onProgress, supabase);
 
 export default function App() {
   const [screen, setScreen] = useState({ name: 'lobby' });

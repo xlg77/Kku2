@@ -99,9 +99,9 @@ export async function fetchCustomWords(lang) {
   return out;
 }
 export async function countCustomWords() {
-  const { count, error } = await supabase.from('custom_words').select('word', { count: 'exact', head: true });
-  if (error) throw error;
-  return count;
+  const { data, error } = await supabase.rpc('kk_dict_info');
+  if (error || !data) throw error || new Error('no info');
+  return Object.values(data).reduce((n, x) => n + x.count, 0);
 }
 export async function uploadCustomWords(rows, onProgress) {
   const CH = 1000;

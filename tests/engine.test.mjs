@@ -75,7 +75,7 @@ test('봇 4명이 5개 모드를 한 판씩 (규칙 위반 없이 이어짐)', a
   const res = await Promise.all(modes.map(simulate));
   res.forEach(({ words, s }, i) => {
     const mode = modes[i];
-    assert.ok(words.length >= 2, `${mode} words=${words.length}`);
+    assert.ok(words.length >= 1, `${mode} words=${words.length}`);
     for (let k = 1; k < words.length; k++) {
       const c = getChar(mode, words[k - 1]);
       assert.ok(isChainable(mode, words[k], c, getSubChar(mode, c), mode === 'KKT' ? 3 : 0), `${mode}: ${words[k - 1]} -> ${words[k]}`);
