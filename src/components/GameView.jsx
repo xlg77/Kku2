@@ -29,7 +29,7 @@ function unlockSpecialAudio() {
         if (!response.ok) throw new Error('특수 MP3 HTTP ' + response.status + ': ' + name);
         const encoded = await response.text();
         if (!encoded.trim()) throw new Error('특수 MP3 파일이 비어 있어요: ' + name);
-        const binary = atob(encoded.replace(/\\s/g, ''));
+        const binary = atob(encoded.trim());
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         return specialAudioContext.decodeAudioData(bytes.buffer);
