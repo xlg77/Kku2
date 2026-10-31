@@ -21,7 +21,10 @@ export function unlockAudio() {
   try {
     const audio = getAudioContext();
     if (!audio) return Promise.reject(new Error('이 브라우저는 Web Audio를 지원하지 않습니다.'));
-    if (audio.state === 'running') return Promise.resolve(true);
+    if (audio.state === 'running') { unlockPromise = Promise.resolve(true); return unlockPromise; }
+    // 이전 resume()이 성공한 뒤 브라우저가 Context를 다시 suspend한 경우,
+    // 완료된 Promise를 재사용하지 말고 실제 resume()을 다시 요청한다.
+    if (unlockPromise) unlockPromise = null;
     if (!unlockPromise) {
       unlockPromise = audio.resume().then(() => {
         if (audio.state !== 'running') throw new Error('오디오 컨텍스트가 활성화되지 않았습니다.');
