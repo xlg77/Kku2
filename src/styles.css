@@ -260,3 +260,14 @@ button{transition:background-color .16s,border-color .16s,box-shadow .16s,transf
 .send{border:0;border-radius:9px;background:#398bd1;color:#fff;box-shadow:0 3px 0 #286fa8;font-weight:800}.send:hover:not(:disabled){background:#2d7fbe}
 .dock.predicting .send{background:#319b8b;box-shadow:0 3px 0 #247d72}.msg.show{color:#bd5b4d}
 @media(max-width:560px){.lobby{padding:14px 12px calc(24px + env(safe-area-inset-bottom))}.hero{padding:12px 0 18px}.panel{padding:16px;border-radius:12px}.game{padding-left:8px;padding-right:8px}.game>.topbar{border-radius:7px}.stage{min-height:118px}.player{padding:7px 8px;gap:6px}.players{grid-template-columns:repeat(2,minmax(0,1fr))}.dock .row{gap:6px}.send{padding:0 16px}.roomlist li{grid-template-columns:minmax(0,1fr) auto auto;gap:7px;padding:9px}}
+
+
+/* Clipboard protection and 20-character celebration */
+.game { -webkit-user-select:none; user-select:none; }
+.game input,.game textarea { -webkit-user-select:text; user-select:text; }
+.special-success{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(15,28,42,.72);animation:specialFade .18s ease-out;pointer-events:none}
+.special-success-card{display:grid;justify-items:center;gap:8px;max-width:min(88vw,360px);animation:specialPop .48s cubic-bezier(.16,1.4,.4,1)}
+.special-success-card img{display:block;width:min(72vw,300px);max-height:62dvh;object-fit:contain;filter:drop-shadow(0 12px 24px rgba(0,0,0,.35))}
+.special-success-card strong{padding:9px 18px;border-radius:999px;background:#fff1a8;color:#684d00;font-size:22px;font-weight:1000;box-shadow:0 4px 0 #d6a93e}
+@keyframes specialFade{from{opacity:0}to{opacity:1}}
+@keyframes specialPop{0%{transform:scale(.35) rotate(-9deg);opacity:0}65%{transform:scale(1.08) rotate(3deg);opacity:1}100%{transform:scale(1) rotate(0)}}
