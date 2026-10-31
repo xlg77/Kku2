@@ -129,11 +129,13 @@ export async function putDictFile(lang, text, format, replace, onProgress) {
   if (!validCount) return '이 파일에서 등록 가능한 단어를 찾지 못했어요. 언어와 파일 형식을 확인해주세요. 기존 사전은 변경하지 않았어요.';
   const STEP = 12000;
   let inserted = 0;
+  let firstSent = true;
   for (let i = 0; i < lines.length; i += STEP) {
     const chunk = lines.slice(i, i + STEP);
     if (!chunk.some(valid)) continue;
-    const r = await rpc('kk_admin_put_words', { p_token: getToken(), p_lang: lang, p_lines: chunk.join('\n'), p_format: format, p_replace: replace && i === 0 });
+    const r = await rpc('kk_admin_put_words', { p_token: getToken(), p_lang: lang, p_lines: chunk.join('\n'), p_format: format, p_replace: replace && firstSent });
     if (r.error) return r.error;
+    firstSent = false;
     inserted += Number(r.data?.count || 0);
     onProgress && onProgress(Math.min(i + STEP, lines.length), lines.length);
   }
