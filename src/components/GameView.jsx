@@ -8,10 +8,10 @@ let specialAudioContext = null;
 let specialAudioBuffers = null;
 let specialAudioLoading = null;
 const SPECIAL_SOUNDS = [
-  'HEAVENLY%20JUMPSTYLE%20%28mp3cut.net%29.mp3',
-  'MONTAGEM%20SUPERSONIC%20-%20KHAOS%20x%20JMILTON%20%28LYRICS%29%20%28mp3cut.net%29.mp3',
-  'SPOOKY%202%20%28mp3cut.net%29.mp3',
-  'X-COOL%21%20%28mp3cut.net%29.mp3',
+  'HEAVENLY JUMPSTYLE (mp3cut.net).mp3',
+  'MONTAGEM SUPERSONIC - KHAOS x JMILTON (LYRICS) (mp3cut.net).mp3',
+  'SPOOKY 2 (mp3cut.net).mp3',
+  'X-COOL! (mp3cut.net).mp3',
 ];
 
 function unlockSpecialAudio() {
@@ -23,10 +23,16 @@ function unlockSpecialAudio() {
     if (!specialAudioBuffers && !specialAudioLoading) {
       // 네 파일 중 하나가 실패해도 나머지 파일은 정상적으로 사용할 수 있게 각각 처리한다.
       specialAudioLoading = Promise.allSettled(SPECIAL_SOUNDS.map(async (name) => {
-        const response = await fetch('https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + name, { mode: 'cors', cache: 'force-cache' });
-        if (!response.ok) throw new Error('MP3 HTTP ' + response.status + ': ' + name);
-        const data = await response.arrayBuffer();
-        return specialAudioContext.decodeAudioData(data);
+        // GitHub Contents API의 base64 응답을 사용해 raw 파일 경로/CORS 문제를 피한다.
+        const apiUrl = 'https://api.github.com/repos/xlg77/the-music-cloud/contents/' + encodeURIComponent(name) + '?ref=main';
+        const response = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-cache' });
+        if (!response.ok) throw new Error('GitHub API HTTP ' + response.status + ': ' + name);
+        const file = await response.json();
+        if (!file.content || file.encoding !== 'base64') throw new Error('GitHub API에서 MP3 데이터가 비어 있어요: ' + name);
+        const binary = atob(file.content.replace(/\\s/g, ''));
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return specialAudioContext.decodeAudioData(bytes.buffer);
       })).then((results) => {
         specialAudioBuffers = results
           .filter((result) => result.status === 'fulfilled')
