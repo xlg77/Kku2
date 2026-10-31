@@ -4,6 +4,9 @@ import TimerBar from './TimerBar.jsx';
 import Result from './Result.jsx';
 import { sfx, isMuted, setMuted } from '../sfx.js';
 
+let unlockedAudio = null;
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+
 const ERR = {
   timeout: () => '응답이 없어요. 다시 시도해주세요',
   chain: (g) => g.mode === 'KAP' ? `‘${g.char}’${g.subChar ? ` (또는 ‘${g.subChar}’)` : ''}(으)로 끝나는 단어를 입력하세요` : `‘${g.char}’${g.subChar ? ` (또는 ‘${g.subChar}’)` : ''}(으)로 시작하는 단어를 입력하세요`,
@@ -34,7 +37,18 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
 
   // 첫 실제 입력/터치로 브라우저 오디오 재생 권한을 확보한다.
   useEffect(() => {
-    const unlock = () => { window.__kku2AudioUnlocked = true; };
+    const unlock = () => {
+      if (unlockedAudio) return;
+      const silent = new Audio(SILENT_WAV);
+      silent.volume = 0;
+      const started = silent.play();
+      if (started?.then) started.then(() => {
+        silent.pause();
+        silent.currentTime = 0;
+        silent.volume = 0.85;
+        unlockedAudio = silent;
+      }).catch(() => {});
+    };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
     window.addEventListener('keydown', unlock, { once: true });
     return () => {
@@ -60,7 +74,8 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
           'SPOOKY%202%20%28mp3cut.net%29.mp3',
           'X-COOL%21%20%28mp3cut.net%29.mp3',
         ];
-        const audio = new Audio('https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + sounds[Math.floor(Math.random() * sounds.length)]);
+        const audio = unlockedAudio || new Audio();
+        audio.src = 'https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + sounds[Math.floor(Math.random() * sounds.length)];
         audio.volume = 0.85;
         audio.play().catch((error) => {
           console.warn('[Kku2] 특수 효과음 재생 실패:', error);
