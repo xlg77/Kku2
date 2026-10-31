@@ -19,7 +19,7 @@ export default function RoomView({ session, meId, onLeave }) {
 
   if (st.phase !== 'waiting') {
     return (
-      <GameView store={session.store} meId={meId} submit={session.submit} record={false}
+      <GameView store={session.store} meId={meId} submit={session.submit} record={false} allowPrediction
         onExit={onLeave} onAgain={isHost ? () => session.resetToWaiting() : undefined} againLabel="대기실로"
       />
     );
