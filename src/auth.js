@@ -118,14 +118,14 @@ export async function deleteCustomWord(word) {
   return r.data.count ? null : '그런 추가 단어가 없어요';
 }
 
-/** GitHub 저장소의 단어 파일(public/data/ko.txt, en.txt 또는 같은 형식의 .txt)을 DB 가 직접 가져온다 */
-export async function importFromRepo(lang, onProgress, path = null) {
-  const STEP = 15000;
-  // 0: 파일을 받아 두기, 이후 1부터 STEP 줄씩 처리 (요청 하나가 3초 안에 끝나도록 잘게 나눔)
-  for (let off = 0; ; off = off === 0 ? 1 : off + STEP) {
-    const r = await rpc('kk_admin_import_repo', { p_token: getToken(), p_lang: lang, p_offset: off, p_limit: STEP, p_path: path });
+/** 사전 파일 통째로 올리기: 줄 단위로 나눠(요청 하나가 3초 안에 끝나도록) 보낸다. format: 'dict'(기본 사전 형식) | 'plain'(한 줄에 단어 하나) */
+export async function putDictFile(lang, text, format, replace, onProgress) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const STEP = 12000;
+  for (let i = 0; i < lines.length; i += STEP) {
+    const r = await rpc('kk_admin_put_words', { p_token: getToken(), p_lang: lang, p_lines: lines.slice(i, i + STEP).join('\n'), p_format: format, p_replace: replace && i === 0 });
     if (r.error) return r.error;
-    onProgress && onProgress(Math.min(off + STEP, r.data.total), r.data.total);
-    if (r.data.done) return null;
+    onProgress && onProgress(Math.min(i + STEP, lines.length), lines.length);
   }
+  return null;
 }

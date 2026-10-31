@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { parseWords } from '../engine/customWords.js';
-import { countCustomWords, uploadCustomWords, deleteCustomWord, importFromRepo } from '../auth.js';
+import { countCustomWords, uploadCustomWords, deleteCustomWord, putDictFile } from '../auth.js';
 
 export default function AdminPanel() {
   const [text, setText] = useState('');
@@ -29,14 +29,18 @@ export default function AdminPanel() {
     setStatus(`✅ ${parsed.rows.length}개 올렸어요. 새 게임부터 반영돼요`);
     setText(''); refresh();
   }
-  async function importRepo() {
-    if (!confirm('GitHub 저장소의 기본 사전(한국어·영어)을 DB에 가져올까요? 1분 안팎 걸려요.')) return;
-    setBusy(true);
-    for (const lang of ['ko', 'en']) {
-      const err = await importFromRepo(lang, (n, t) => setStatus(`저장소에서 가져오는 중… ${lang === 'ko' ? '한국어' : '영어'} ${n}/${t}`));
-      if (err) { setBusy(false); return setStatus('⚠️ 실패: ' + err); }
-    }
-    setBusy(false); setStatus('✅ 저장소 사전을 가져왔어요. 새 멀티 게임부터 반영돼요');
+  const [dLang, setDLang] = useState('ko');
+  const [dFmt, setDFmt] = useState('dict');
+  const [dReplace, setDReplace] = useState(true);
+  async function onDictFile(e) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    if (dReplace && !confirm(`${dLang === 'ko' ? '한국어' : '영어'} 사전을 이 파일 내용으로 통째로 바꿀까요? 기존 ${dLang === 'ko' ? '한국어' : '영어'} 단어는 모두 지워져요.`)) return;
+    setBusy(true); setStatus('파일 읽는 중…');
+    const err = await putDictFile(dLang, await f.text(), dFmt, dReplace, (n, t) => setStatus(`DB에 올리는 중… ${n}/${t}줄`));
+    setBusy(false);
+    setStatus(err ? '⚠️ 실패: ' + err : '✅ 사전을 올렸어요. 새 멀티 게임부터 반영돼요');
   }
   async function remove(e) {
     e.preventDefault();
@@ -51,7 +55,24 @@ export default function AdminPanel() {
     <section className="panel admin">
       <h2>🔧 관리자: 단어 올리기 <small>추가 단어 {total ?? '?'}개</small></h2>
       <p className="note">한 줄에 하나씩 붙여넣거나 파일(txt/csv/tsv)을 고르세요. 열을 쓰려면 <code>단어,언어,외래어,어인정,표준</code> 순서(탭 또는 쉼표). 언어·나머지 열은 비워도 돼요.</p>
-      <button className="ghost" type="button" disabled={busy} onClick={importRepo}>📦 GitHub 저장소 기본 사전 가져오기 (빠름)</button>
+      <div className="admin-dict">
+        <h3 className="h2">📚 멀티플레이 사전 통째로 올리기</h3>
+        <div className="admin-row">
+          <div className="seg" role="radiogroup" aria-label="사전 언어">
+            {[['ko', '한국어'], ['en', '영어']].map(([v, n]) => (
+              <button type="button" key={v} role="radio" aria-checked={dLang === v} className={dLang === v ? 'on' : ''} onClick={() => setDLang(v)}>{n}</button>
+            ))}
+          </div>
+          <div className="seg" role="radiogroup" aria-label="파일 형식">
+            {[['dict', '기본 사전 형식'], ['plain', '한 줄에 단어 하나']].map(([v, n]) => (
+              <button type="button" key={v} role="radio" aria-checked={dFmt === v} className={dFmt === v ? 'on' : ''} onClick={() => setDFmt(v)}>{n}</button>
+            ))}
+          </div>
+        </div>
+        <label className="check"><input type="checkbox" checked={dReplace} onChange={(e) => setDReplace(e.target.checked)} /> 기존 사전을 지우고 이 파일로 교체 (끄면 단어만 추가·덮어쓰기)</label>
+        <label className={'go filebtn' + (busy ? ' disabled' : '')}>사전 파일 선택해서 올리기<input type="file" accept=".txt,.tsv,.csv,text/plain" onChange={onDictFile} disabled={busy} hidden /></label>
+        <p className="note">‘기본 사전 형식’은 <code>단어+플래그+표준(0/1)+조회수(0~9)</code>(예: <code>에콜드파리500</code>, 영어는 <code>apple7</code>)이고, ‘한 줄에 단어 하나’는 단어만 적힌 txt예요. 35만 단어도 1분 안팎이에요.</p>
+      </div>
       <textarea className="text" rows={6} value={text} onChange={(e) => setText(e.target.value)} placeholder={'끄투\n프리서버\nkkutu'} spellCheck={false} aria-label="올릴 단어" />
       <div className="admin-row">
         <label className="ghost filebtn">파일 선택<input type="file" accept=".txt,.csv,.tsv,text/plain,text/csv" onChange={onFile} hidden /></label>
