@@ -8,6 +8,12 @@ export default function RoomView({ session, meId, onLeave }) {
   const st = useSyncExternalStore(session.subscribe, session.getState);
   const [text, setText] = useState('');
   const [starting, setStarting] = useState(false);
+  useEffect(() => {
+    const unlock = () => { void unlockAudio().catch(() => {}); };
+    window.addEventListener('pointerdown', unlock, { once: true, passive: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+  }, []);
   const chatRef = useRef(null);
   const isHost = session.isHost;
   useEffect(() => { chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight }); }, [st.chat.length]);
