@@ -1,2 +1,0 @@
--- Realtime room notifications are sent by the Kku2 client after a successful
--- server-authoritative RPC. No database trigger is required.
