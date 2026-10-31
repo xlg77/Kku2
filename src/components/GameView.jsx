@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { MODES, OPT_LABELS, isChainable } from '../engine/rules.js';
 import TimerBar from './TimerBar.jsx';
 import Result from './Result.jsx';
-import { sfx, isMuted, setMuted } from '../sfx.js';
+import { sfx, isMuted, setMuted, getAudioContext, unlockAudio } from '../sfx.js';
 
 let specialAudioContext = null;
 let specialAudioBuffers = null;
@@ -18,8 +18,8 @@ function unlockSpecialAudio() {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
-    specialAudioContext ||= new AudioContextClass();
-    if (specialAudioContext.state === 'suspended') void specialAudioContext.resume();
+    specialAudioContext = getAudioContext();
+    void unlockAudio().catch((error) => console.warn('[Kku2] 게임 오디오 잠금 해제 실패:', error));
     if (!specialAudioBuffers && !specialAudioLoading) {
       specialAudioLoading = Promise.all(SPECIAL_SOUNDS.map(async (name) => {
         const response = await fetch('https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + name, { mode: 'cors', cache: 'force-cache' });
@@ -78,7 +78,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
 
   // 사용자의 첫 클릭/터치/키 입력 안에서 Web Audio를 활성화하고 MP3를 미리 불러온다.
   useEffect(() => {
-    const unlock = () => unlockSpecialAudio();
+    const unlock = () => { void unlockAudio().catch(() => {}); unlockSpecialAudio(); };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
     window.addEventListener('keydown', unlock, { once: true });
     return () => {
