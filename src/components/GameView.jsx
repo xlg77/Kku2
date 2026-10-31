@@ -21,12 +21,31 @@ function unlockSpecialAudio() {
     specialAudioContext = getAudioContext();
     void unlockAudio().catch((error) => console.warn('[Kku2] 게임 오디오 잠금 해제 실패:', error));
     if (!specialAudioBuffers && !specialAudioLoading) {
-      specialAudioLoading = Promise.all(SPECIAL_SOUNDS.map(async (name) => {
+      // 네 파일 중 하나가 실패해도 나머지 파일은 정상적으로 사용할 수 있게 각각 처리한다.
+      specialAudioLoading = Promise.allSettled(SPECIAL_SOUNDS.map(async (name) => {
         const response = await fetch('https://raw.githubusercontent.com/xlg77/the-music-cloud/main/' + name, { mode: 'cors', cache: 'force-cache' });
         if (!response.ok) throw new Error('MP3 HTTP ' + response.status + ': ' + name);
-        return specialAudioContext.decodeAudioData(await response.arrayBuffer());
-      })).then((buffers) => { specialAudioBuffers = buffers; return buffers; })
-        .catch((error) => { specialAudioLoading = null; console.warn('[Kku2] 특수 MP3 사전 로드 실패:', error); throw error; });
+        const data = await response.arrayBuffer();
+        return specialAudioContext.decodeAudioData(data);
+      })).then((results) => {
+        specialAudioBuffers = results
+          .filter((result) => result.status === 'fulfilled')
+          .map((result) => result.value);
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.warn('[Kku2] 특수 MP3 로드 실패:', SPECIAL_SOUNDS[index], result.reason);
+          }
+        });
+        if (!specialAudioBuffers.length) {
+          specialAudioLoading = null;
+          throw new Error('재생 가능한 특수 MP3를 불러오지 못했습니다.');
+        }
+        return specialAudioBuffers;
+      }).catch((error) => {
+        specialAudioLoading = null;
+        console.warn('[Kku2] 특수 MP3 사전 로드 실패:', error);
+        throw error;
+      });
     }
   } catch (error) {
     console.warn('[Kku2] 오디오 초기화 실패:', error);
@@ -36,9 +55,10 @@ function unlockSpecialAudio() {
 async function playSpecialAudio() {
   unlockSpecialAudio();
   if (!specialAudioContext) throw new Error('Web Audio를 지원하지 않는 브라우저예요.');
-  if (specialAudioContext.state === 'suspended') await specialAudioContext.resume();
+  await unlockAudio();
   const buffers = specialAudioBuffers || await specialAudioLoading;
-  if (specialAudioContext.state === 'suspended') await specialAudioContext.resume();
+  if (!buffers?.length) throw new Error('재생 가능한 특수 MP3가 없어요.');
+  if (specialAudioContext.state !== 'running') await specialAudioContext.resume();
   const buffer = buffers[Math.floor(Math.random() * buffers.length)];
   const source = specialAudioContext.createBufferSource();
   const gain = specialAudioContext.createGain();
