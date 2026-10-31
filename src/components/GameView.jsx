@@ -94,11 +94,13 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   useEffect(() => {
     if (!s || !s.last) return;
     // 서버가 id를 생략하는 경우에도 마지막 성공 이벤트를 구분한다.
-    const eventKey = s.last.id ?? [s.last.pid, s.last.word ?? s.chain?.[s.chain.length - 1] ?? '', s.last.score, s.last.ok, s.phase].join('|');
+    const eventWord = typeof s.last.word === 'string' ? s.last.word : (s.last.ok ? s.chain?.[s.chain.length - 1] ?? '' : '');
+    // id만으로 중복 판정하면 멀티플레이 서버에서 id가 재사용될 때 이후 성공 이벤트가 전부 누락될 수 있다.
+    const eventKey = [s.last.id ?? '', s.last.pid ?? '', eventWord, s.last.score ?? '', s.last.ok ?? '', s.phase].join('|');
     if (eventKey === prevLast.current) return;
     prevLast.current = eventKey;
     // 서버가 last.word를 생략하면 갱신된 chain의 마지막 단어를 사용한다.
-    const successfulWord = typeof s.last.word === 'string' ? s.last.word : (s.last.ok ? s.chain?.[s.chain.length - 1] : '');
+    const successfulWord = eventWord;
     if (s.last.ok && typeof successfulWord === 'string' && Array.from(successfulWord.trim()).length === 20) {
       if (!muted) {
         // 대체 효과음 없이 저장소의 MP3만 재생한다. 로드/재생 오류는 콘솔에 남긴다.
