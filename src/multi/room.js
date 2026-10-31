@@ -53,6 +53,7 @@ export class LobbyNet {
     this.timer = null;
     this.channel = null;
     this.polling = false;
+    this.pollAgain = false;
     this.dead = false;
   }
   start() {
@@ -66,7 +67,8 @@ export class LobbyNet {
     this.timer = setInterval(() => this.poll(), 12000);
   }
   async poll() {
-    if (this.polling || this.dead) return;
+    if (this.dead) return;
+    if (this.polling) { this.pollAgain = true; return; }
     this.polling = true;
     try {
       const { data, error } = await supabase.rpc('kk_list_rooms');
@@ -78,6 +80,10 @@ export class LobbyNet {
       // Realtime 및 다음 heartbeat에서 자동으로 다시 동기화한다.
     } finally {
       this.polling = false;
+      if (this.pollAgain && !this.dead) {
+        this.pollAgain = false;
+        void this.poll();
+      }
     }
   }
   watch(f) { this.cbs.add(f); f(this.rooms); return () => this.cbs.delete(f); }
@@ -114,6 +120,7 @@ export class RoomSession {
     this.version = -1;
     this.dead = false;
     this.busy = false;
+    this.refreshQueued = false;
     this.offset = 0;
     this.timer = null;
     this.channel = null;
@@ -162,7 +169,8 @@ export class RoomSession {
     this.timer = setTimeout(() => this.tick(false), delay);
   }
   async tick(fromBroadcast = false) {
-    if (this.dead || this.busy) return;
+    if (this.dead) return;
+    if (this.busy) { if (fromBroadcast) this.refreshQueued = true; return; }
     clearTimeout(this.timer);
     this.timer = null;
     this.busy = true;
@@ -185,7 +193,12 @@ export class RoomSession {
       }
     } finally {
       this.busy = false;
-      this.schedule();
+      if (this.refreshQueued && !this.dead) {
+        this.refreshQueued = false;
+        void this.tick(true);
+      } else {
+        this.schedule();
+      }
     }
   }
   close(reason) {
@@ -210,6 +223,9 @@ export class RoomSession {
         notifyRoomChanged(this.code, r.data.room.version, 'UPDATE');
       }
       this.schedule();
+    } else if (r.data.ok === true) {
+      // kk_room_chat은 ok만 반환하므로, 방 채널에 변경 알림을 보내 다른 참가자의 채팅을 갱신한다.
+      notifyRoomChanged(this.code, null, 'UPDATE');
     }
     return { ok: r.data.ok !== false, code: r.data.code };
   }
