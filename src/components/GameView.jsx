@@ -8,10 +8,10 @@ let specialAudioContext = null;
 let specialAudioBuffers = null;
 let specialAudioLoading = null;
 const SPECIAL_SOUNDS = [
-  'HEAVENLY JUMPSTYLE (mp3cut.net).mp3',
-  'MONTAGEM SUPERSONIC - KHAOS x JMILTON (LYRICS) (mp3cut.net).mp3',
-  'SPOOKY 2 (mp3cut.net).mp3',
-  'X-COOL! (mp3cut.net).mp3',
+  'special-1.mp3.b64',
+  'special-2.mp3.b64',
+  'special-3.mp3.b64',
+  'special-4.mp3.b64',
 ];
 
 function unlockSpecialAudio() {
@@ -23,13 +23,13 @@ function unlockSpecialAudio() {
     if (!specialAudioBuffers && !specialAudioLoading) {
       // 네 파일 중 하나가 실패해도 나머지 파일은 정상적으로 사용할 수 있게 각각 처리한다.
       specialAudioLoading = Promise.allSettled(SPECIAL_SOUNDS.map(async (name) => {
-        // GitHub Contents API의 base64 응답을 사용해 raw 파일 경로/CORS 문제를 피한다.
-        const apiUrl = 'https://api.github.com/repos/xlg77/the-music-cloud/contents/' + encodeURIComponent(name) + '?ref=main';
-        const response = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-cache' });
-        if (!response.ok) throw new Error('GitHub API HTTP ' + response.status + ': ' + name);
-        const file = await response.json();
-        if (!file.content || file.encoding !== 'base64') throw new Error('GitHub API에서 MP3 데이터가 비어 있어요: ' + name);
-        const binary = atob(file.content.replace(/\\s/g, ''));
+        // MP3 Base64 파일을 같은 사이트에서 불러와 별도 GitHub API 인증/CORS 의존성을 없앤다.
+        const audioUrl = import.meta.env.BASE_URL + 'audio/' + name;
+        const response = await fetch(audioUrl, { cache: 'force-cache' });
+        if (!response.ok) throw new Error('특수 MP3 HTTP ' + response.status + ': ' + name);
+        const encoded = await response.text();
+        if (!encoded.trim()) throw new Error('특수 MP3 파일이 비어 있어요: ' + name);
+        const binary = atob(encoded.replace(/\\s/g, ''));
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         return specialAudioContext.decodeAudioData(bytes.buffer);
