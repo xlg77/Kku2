@@ -7,6 +7,8 @@ import { sfx, isMuted, setMuted, getAudioContext, unlockAudio } from '../sfx.js'
 let specialAudioContext = null;
 let specialAudioBuffers = null;
 let specialAudioLoading = null;
+let specialAudioSource = null;
+let specialAudioPlaybackPromise = null;
 const SPECIAL_SOUNDS = [
   'special-1.mp3.b64',
   'special-2.mp3.b64',
@@ -59,21 +61,48 @@ function unlockSpecialAudio() {
 }
 
 async function playSpecialAudio(onStart) {
-  unlockSpecialAudio();
-  if (!specialAudioContext) throw new Error('Web Audio를 지원하지 않는 브라우저예요.');
-  await unlockAudio();
-  const buffers = specialAudioBuffers || await specialAudioLoading;
-  if (!buffers?.length) throw new Error('재생 가능한 특수 MP3가 없어요.');
-  if (specialAudioContext.state !== 'running') await specialAudioContext.resume();
-  const buffer = buffers[Math.floor(Math.random() * buffers.length)];
-  const source = specialAudioContext.createBufferSource();
-  const gain = specialAudioContext.createGain();
-  source.buffer = buffer;
-  gain.gain.value = 0.85;
-  source.connect(gain).connect(specialAudioContext.destination);
-  onStart?.();
-  source.start(0);
-  return buffer.duration;
+  // 로딩 중이거나 이미 재생 중이면 새 요청을 버려 중복 재생을 막는다.
+  if (specialAudioSource || specialAudioPlaybackPromise) return 0;
+
+  const playback = (async () => {
+    unlockSpecialAudio();
+    if (!specialAudioContext) throw new Error('Web Audio를 지원하지 않는 브라우저예요.');
+    await unlockAudio();
+    const buffers = specialAudioBuffers || await specialAudioLoading;
+    if (!buffers?.length) throw new Error('재생 가능한 특수 MP3가 없어요.');
+    if (specialAudioContext.state !== 'running') await specialAudioContext.resume();
+
+    // 오디오 잠금 해제/버퍼 대기 중 다른 요청이 시작됐는지도 다시 확인한다.
+    if (specialAudioSource) return 0;
+
+    const buffer = buffers[Math.floor(Math.random() * buffers.length)];
+    const source = specialAudioContext.createBufferSource();
+    const gain = specialAudioContext.createGain();
+    source.buffer = buffer;
+    gain.gain.value = 0.85;
+    source.connect(gain).connect(specialAudioContext.destination);
+    specialAudioSource = source;
+    source.onended = () => {
+      if (specialAudioSource === source) specialAudioSource = null;
+      try { source.disconnect(); gain.disconnect(); } catch {}
+    };
+    onStart?.();
+    try {
+      source.start(0);
+    } catch (error) {
+      if (specialAudioSource === source) specialAudioSource = null;
+      try { source.disconnect(); gain.disconnect(); } catch {}
+      throw error;
+    }
+    return buffer.duration;
+  })();
+
+  specialAudioPlaybackPromise = playback;
+  try {
+    return await playback;
+  } finally {
+    if (specialAudioPlaybackPromise === playback) specialAudioPlaybackPromise = null;
+  }
 }
 
 const ERR = {
