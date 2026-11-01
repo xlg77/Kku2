@@ -5,7 +5,7 @@ import RoomList from './components/RoomList.jsx';
 import RoomView from './components/RoomView.jsx';
 import AuthScreen from './components/AuthScreen.jsx';
 import { loadDict } from './engine/dict.js';
-import { MODES } from './engine/rules.js';
+import { MODES, makeTitle } from './engine/rules.js';
 import { useAuth } from './auth.js';
 import { supabase } from './supabase.js';
 import { LobbyNet, RoomSession, createRoom as createRoomRpc, joinRoom as joinRoomRpc } from './multi/room.js';
@@ -38,7 +38,8 @@ export default function App() {
     setLoading({ pct: 0 });
     try {
       const dict = await dictFor(MODES[cfg.mode].lang, (pct) => setLoading({ pct }));
-      setScreen({ name: 'game', cfg: { ...cfg, dict }, key: Date.now() });
+      const title = makeTitle(dict, cfg.mode, cfg.rounds, cfg.opts || {});
+      setScreen({ name: 'game', cfg: { ...cfg, dict, title }, key: Date.now() });
     } catch (e) {
       setError(String(e.message || e));
     } finally {
