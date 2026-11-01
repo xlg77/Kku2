@@ -101,36 +101,36 @@ export const mkMission = (lang) => {
 const shuffle = (a) => { const r = a.slice(); for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; };
 export { shuffle };
 
-// 라운드마다 시작 글자가 될 "제목 단어"를 뽑는다 (원본 getTitle).
+// 라운드 수와 정확히 같은 글자 수를 가진 실제 사전 단어를 제시어로 고른다.
+// 제시어 자체를 화면에 공개하지 않고, 각 라운드에 해당 글자만 순서대로 제시한다.
 export function makeTitle(dict, mode, rounds, opts) {
   const lang = MODES[mode].lang;
-  const len = Math.max(1, rounds);
-  for (let tries = 0; tries < 60; tries++) {
-    let test;
-    if (lang === 'ko') {
-      const a = initialStart(Math.floor(Math.random() * 18));
-      const b = a + 587;
-      test = mode === 'KAP'
-        ? (w) => { const c = w.charCodeAt(w.length - 1); return c >= a && c <= b; }
-        : (w) => { const c = w.charCodeAt(0); return c >= a && c <= b; };
-    } else {
-      const ch = String.fromCharCode(97 + Math.floor(Math.random() * 26));
-      test = (w) => w[0] === ch;
-    }
-    const pool = [];
-    for (const e of dict.words.values()) {
-      if (e.w.length !== len || !test(e.w)) continue;
-      if (lang === 'ko' && entryDenied(e, opts)) continue;
-      pool.push(e.w);
-      if (pool.length > 400) break;
-    }
-    for (const w of shuffle(pool).slice(0, 20)) {
-      const chars = w.split('');
-      if (chars.every((c) => candidates(dict, mode, c, getSubChar(mode, c), opts, { limit: 1, wordLength: mode === 'KKT' ? 3 : 0 }).length)) return chars;
-    }
+  const length = Math.max(1, Math.floor(Number(rounds) || 1));
+  const wordLength = mode === 'KKT' ? 3 : 0;
+  const pool = [];
+
+  // 무작위 초성만 반복 탐색하다가 '가나다...' 같은 가짜 글자로 대체하던 기존 방식을 제거한다.
+  // 실제로 로드된 사전 전체에서 라운드 수와 글자 수가 일치하는 단어만 찾는다.
+  for (const entry of dict.words.values()) {
+    const letters = Array.from(entry.w || '');
+    if (letters.length !== length) continue;
+    if (lang === 'ko' && entryDenied(entry, opts)) continue;
+
+    const usable = letters.every((char) => (
+      candidates(dict, mode, char, getSubChar(mode, char), opts, {
+        limit: 1,
+        wordLength,
+      }).length > 0
+    ));
+    if (usable) pool.push(entry.w);
   }
-  const ex = lang === 'ko' ? '가나다라마바사아자차' : 'abcdefghij';
-  return ex.split('').slice(0, len);
+
+  if (!pool.length) {
+    throw new Error(`현재 사전에서 ${length}글자 제시어를 찾지 못했어요. 사전 데이터와 게임 규칙을 확인하거나 라운드 수를 바꿔주세요.`);
+  }
+
+  const word = pool[Math.floor(Math.random() * pool.length)];
+  return Array.from(word);
 }
 
 export const cleanOpts = (modeKey, opts) =>
