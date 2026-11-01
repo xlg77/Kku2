@@ -4,7 +4,6 @@ create index if not exists words_lang_length_idx
 create or replace function kkutu_private.make_title(p_mode text, p_rounds integer, p_opts jsonb)
 returns text[]
 language plpgsql
-stable
 set search_path to ''
 as $function$
 declare
