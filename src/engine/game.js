@@ -61,7 +61,7 @@ export class Game {
 
   /* ---------- 진행 ---------- */
   start() {
-    this.title = makeTitle(this.dict, this.mode, this.cfg.rounds, this.opts);
+    this.title = this.cfg.title || makeTitle(this.dict, this.mode, this.cfg.rounds, this.opts);
     this.round = 0;
     this.later(() => this.nextRound(), 400);
     this.emit({ phase: 'starting' });
