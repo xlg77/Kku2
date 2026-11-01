@@ -67,7 +67,7 @@ export default function AdminPanel() {
   return (
     <section className="panel admin">
       <h2>🔧 관리자: 단어 올리기 <small>DB 사전 {total ?? '?'}개</small></h2>
-      <p className="note">멀티플레이 사전 파일은 TXT만 지원해요. 일반 단어 목록은 한 줄에 단어 하나씩 저장한 TXT를 선택하세요.</p>
+      <p className="note">멀티플레이 사전 파일은 TXT만 지원해요. 일반 단어 목록은 한 줄에 단어 하나씩 저장한 TXT를 선택하세요. 이미 있는 단어는 새 값으로 덮어쓰고, 같은 단어가 여러 번 있으면 마지막 줄이 적용돼요.</p>
       <div className="admin-dict">
         <h3 className="h2">📚 멀티플레이 사전 통째로 올리기</h3>
         <div className="admin-row">
