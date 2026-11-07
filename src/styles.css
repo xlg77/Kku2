@@ -272,8 +272,10 @@ button{transition:background-color .16s,border-color .16s,box-shadow .16s,transf
 @keyframes specialFade{from{opacity:0}to{opacity:1}}
 @keyframes specialPop{0%{transform:scale(.35) rotate(-9deg);opacity:0}65%{transform:scale(1.08) rotate(3deg);opacity:1}100%{transform:scale(1) rotate(0)}}
 
-/* 로비: 검정 배경 + SwarmCursor. 컨테이너를 화면에 고정하고 로비 내용은 그 안에서 스크롤한다. */
-.swarm-cursor.lobby-swarm { position: fixed; inset: 0; width: 100%; height: 100vh; height: 100dvh; background: #000; }
+/* 로비 배경: 화면에 고정된 검정 바탕 위에 LineWaves를 깐다. */
+.lobby-bg { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100vh; height: 100dvh; background: #000; overflow: hidden; }
+/* 로비: SwarmCursor. 컨테이너를 화면에 고정(배경 위)하고 로비 내용은 그 안에서 스크롤한다. */
+.swarm-cursor.lobby-swarm { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100vh; height: 100dvh; background: transparent; }
 .lobby-swarm .swarm-cursor-content { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-color: #4a4a4a transparent; }
 .lobby-swarm .tagline { color: #d4dbe5; }
 .lobby-swarm .tagline b { color: #7cc4ff; }

@@ -8,6 +8,7 @@ import SettingsFields from './SettingsFields.jsx';
 import SwarmCursor from './SwarmCursor.jsx';
 import TechText from './TechText.jsx';
 import TargetCursor from './TargetCursor.jsx';
+import LineWaves from './LineWaves.jsx';
 import { MODES, cleanOpts } from '../engine/rules.js';
 import { unlockAudio } from '../sfx.js';
 
@@ -43,41 +44,44 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
   }
 
   return (
-    <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" className="lobby-swarm">
-      <TargetCursor targetSelector="button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), label, .cursor-target" />
-      <main className="lobby">
-        <header className="hero">
-          <div className="logo-tech">
-            <TechText text="끄투" fontWeight={900} letterSpacing={0} color="#ffffff" accentColor="#7cc4ff" />
-          </div>
-          <p className="tagline">글자로 놀자! <b>끄투 프리서버</b></p>
-        </header>
+    <>
+      <div className="lobby-bg" aria-hidden="true"><LineWaves /></div>
+      <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" className="lobby-swarm">
+        <TargetCursor targetSelector="button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), label, .cursor-target" />
+        <main className="lobby">
+          <header className="hero">
+            <div className="logo-tech">
+              <TechText text="끄투" fontWeight={900} letterSpacing={0} color="#ffffff" accentColor="#7cc4ff" />
+            </div>
+            <p className="tagline">글자로 놀자! <b>끄투 프리서버</b></p>
+          </header>
 
-        <Account auth={auth} />
+          <Account auth={auth} />
 
-        <button className="go multi-go" type="button" onClick={() => { void unlockAudio().catch((error) => console.warn('[Kku2] 멀티 시작 시 오디오 활성화 실패:', error)); save('settings', s); onMulti(); }} disabled={!auth.profile}>🌐 멀티플레이 (친구와 함께)</button>
-        <p className="or">또는 봇과 연습하기</p>
+          <button className="go multi-go" type="button" onClick={() => { void unlockAudio().catch((error) => console.warn('[Kku2] 멀티 시작 시 오디오 활성화 실패:', error)); save('settings', s); onMulti(); }} disabled={!auth.profile}>🌐 멀티플레이 (친구와 함께)</button>
+          <p className="or">또는 봇과 연습하기</p>
 
-        <form className="panel" onSubmit={go}>
-          <SettingsFields s={s} set={set} minBots={1} />
-          {error && <p className="error" role="alert">{error}</p>}
-          <button className="go" type="submit" disabled={!!loading || !auth.profile}>
-            {loading ? `사전 불러오는 중… ${Math.round((loading.pct || 0) * 100)}%` : '봇과 게임 시작'}
-            {loading && <i className="go-fill" style={{ width: (loading.pct || 0) * 100 + '%' }} />}
-          </button>
-        </form>
+          <form className="panel" onSubmit={go}>
+            <SettingsFields s={s} set={set} minBots={1} />
+            {error && <p className="error" role="alert">{error}</p>}
+            <button className="go" type="submit" disabled={!!loading || !auth.profile}>
+              {loading ? `사전 불러오는 중… ${Math.round((loading.pct || 0) * 100)}%` : '봇과 게임 시작'}
+              {loading && <i className="go-fill" style={{ width: (loading.pct || 0) * 100 + '%' }} />}
+            </button>
+          </form>
 
-        <Leaderboard meId={auth.user?.id} version={lbVersion} />
+          <Leaderboard meId={auth.user?.id} version={lbVersion} />
 
-        {auth.isAdmin && <AdminPanel />}
+          {auth.isAdmin && <AdminPanel />}
 
-        <footer className="foot">
-          <p>
-            원본 <a href="https://github.com/JJoriping/KKuTu" target="_blank" rel="noreferrer">JJoriping/KKuTu</a>의 규칙·점수식·봇 로직·단어 DB를 정적 웹용으로 옮긴 비공식 프리서버입니다. (GPL-3.0)
-          </p>
-          <p>영어 사전은 <a href="https://wordnet.princeton.edu/" target="_blank" rel="noreferrer">WordNet</a> 자료를 포함합니다. © Princeton University.</p>
-        </footer>
-      </main>
-    </SwarmCursor>
+          <footer className="foot">
+            <p>
+              원본 <a href="https://github.com/JJoriping/KKuTu" target="_blank" rel="noreferrer">JJoriping/KKuTu</a>의 규칙·점수식·봇 로직·단어 DB를 정적 웹용으로 옮긴 비공식 프리서버입니다. (GPL-3.0)
+            </p>
+            <p>영어 사전은 <a href="https://wordnet.princeton.edu/" target="_blank" rel="noreferrer">WordNet</a> 자료를 포함합니다. © Princeton University.</p>
+          </footer>
+        </main>
+      </SwarmCursor>
+    </>
   );
 }
