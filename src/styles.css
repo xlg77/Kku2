@@ -285,3 +285,14 @@ button{transition:background-color .16s,border-color .16s,box-shadow .16s,transf
 
 /* 로비 로고: TechText(검정 배경 위 흰 글자). 컴포넌트가 부모 크기를 채우므로 높이를 지정한다. */
 .lobby-swarm .logo-tech { width: min(100%, 520px); height: clamp(150px, 42vw, 200px); margin: 0 auto; }
+
+/* 전역 BubbleMenu: 오른쪽 위 버튼만 쓰고, 그 띠만큼 화면 위쪽을 비워 기존 상단 바와 겹치지 않게 한다. */
+.bubble-menu.kku-menu { top: calc(8px + env(safe-area-inset-top)); padding: 0 12px; justify-content: flex-end; }
+.bubble-menu.kku-menu .logo-bubble { display: none; }
+.bubble-menu.kku-menu .bubble { --bubble-size: 44px; }
+body:has(.bubble-menu.kku-menu) .lobby { padding-top: calc(64px + env(safe-area-inset-top)); }
+body:has(.bubble-menu.kku-menu) .game { padding-top: calc(60px + env(safe-area-inset-top)); }
+@media (max-height: 560px) and (orientation: landscape) {
+  body:has(.bubble-menu.kku-menu) .lobby { padding-top: 56px; }
+  body:has(.bubble-menu.kku-menu) .game { padding-top: 52px; }
+}

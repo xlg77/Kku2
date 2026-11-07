@@ -4,6 +4,7 @@ import SinglePlay from './components/SinglePlay.jsx';
 import RoomList from './components/RoomList.jsx';
 import RoomView from './components/RoomView.jsx';
 import AuthScreen from './components/AuthScreen.jsx';
+import BubbleMenu from './components/BubbleMenu.jsx';
 import { loadDict } from './engine/dict.js';
 import { MODES, makeTitle } from './engine/rules.js';
 import { useAuth } from './auth.js';
@@ -69,17 +70,36 @@ export default function App() {
     setScreen({ name: 'rooms' });
   };
 
+  // 로그인 후 모든 화면에서 쓰는 메뉴. 게임·방 안에서는 나가기 전에 한 번 확인한다.
+  const guard = (fn) => () => {
+    if ((screen.name === 'game' || screen.name === 'room') && !confirm('진행 중인 게임(방)에서 나갈까요?')) return;
+    fn();
+  };
+  const goRooms = () => (screen.name === 'room' ? leaveRoom() : toRooms());
+  const hover = (bgColor) => ({ bgColor, textColor: '#ffffff' });
+  const menuItems = [
+    { label: '처음으로', ariaLabel: '처음으로 가기', href: '#', rotation: -8, hoverStyles: hover('#3b82f6'), onClick: guard(home) },
+    { label: '멀티플레이', ariaLabel: '멀티플레이 방 목록', href: '#', rotation: 8, hoverStyles: hover('#10b981'), onClick: guard(goRooms) },
+    { label: '로그아웃', ariaLabel: '로그아웃', href: '#', rotation: -8, hoverStyles: hover('#ef4444'), onClick: guard(() => auth.signOut()) },
+  ];
+  const withMenu = (node) => (
+    <>
+      {node}
+      <BubbleMenu className="kku-menu" useFixedPosition logo={<b>끄투</b>} menuAriaLabel="메뉴 열기/닫기" items={menuItems} />
+    </>
+  );
+
   if (!auth.ready) return <main className="lobby"><p className="sub" style={{ textAlign: 'center', marginTop: 80 }}>불러오는 중…</p></main>;
   if (!auth.user) return <AuthScreen auth={auth} />;
 
   if (screen.name === 'game') {
-    return <SinglePlay key={screen.key} cfg={screen.cfg} onExit={home} onAgain={() => setScreen({ ...screen, key: Date.now() })} onRecorded={() => auth.refresh()} />;
+    return withMenu(<SinglePlay key={screen.key} cfg={screen.cfg} onExit={home} onAgain={() => setScreen({ ...screen, key: Date.now() })} onRecorded={() => auth.refresh()} />);
   }
   if (screen.name === 'rooms') {
-    return <RoomList lobby={getLobby()} nickname={auth.profile.nickname} onCreate={createRoom} onJoin={joinRoom} onBack={home} error={error} />;
+    return withMenu(<RoomList lobby={getLobby()} nickname={auth.profile.nickname} onCreate={createRoom} onJoin={joinRoom} onBack={home} error={error} />);
   }
   if (screen.name === 'room') {
-    return <RoomView session={screen.session} meId={auth.user.id} onLeave={leaveRoom} />;
+    return withMenu(<RoomView session={screen.session} meId={auth.user.id} onLeave={leaveRoom} />);
   }
-  return <Lobby onStart={start} onMulti={toRooms} loading={loading} error={error} auth={auth} lbVersion={lbVersion} />;
+  return withMenu(<Lobby onStart={start} onMulti={toRooms} loading={loading} error={error} auth={auth} lbVersion={lbVersion} />);
 }
