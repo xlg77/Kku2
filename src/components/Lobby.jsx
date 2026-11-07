@@ -6,6 +6,7 @@ import Leaderboard from './Leaderboard.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import SettingsFields from './SettingsFields.jsx';
 import SwarmCursor from './SwarmCursor.jsx';
+import TechText from './TechText.jsx';
 import { MODES, cleanOpts } from '../engine/rules.js';
 import { unlockAudio } from '../sfx.js';
 
@@ -44,8 +45,8 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
     <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" className="lobby-swarm">
       <main className="lobby">
         <header className="hero">
-          <div className="logo" aria-label="끄투">
-            <span>끄</span><span>투</span>
+          <div className="logo-tech">
+            <TechText text="끄투" fontWeight={900} letterSpacing={0} color="#ffffff" accentColor="#7cc4ff" />
           </div>
           <p className="tagline">글자로 놀자! <b>끄투 프리서버</b></p>
         </header>

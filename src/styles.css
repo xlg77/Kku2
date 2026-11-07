@@ -280,3 +280,6 @@ button{transition:background-color .16s,border-color .16s,box-shadow .16s,transf
 .lobby-swarm .or { color: #a9b6c6; }
 .lobby-swarm .foot { color: #8c9aac; }
 .lobby-swarm .foot a { color: #7cc4ff; }
+
+/* 로비 로고: TechText(검정 배경 위 흰 글자). 컴포넌트가 부모 크기를 채우므로 높이를 지정한다. */
+.lobby-swarm .logo-tech { width: min(100%, 520px); height: clamp(150px, 42vw, 200px); margin: 0 auto; }
