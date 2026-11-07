@@ -41,7 +41,7 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
   }
 
   return (
-    <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" fixed>
+    <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" className="lobby-swarm">
       <main className="lobby">
         <header className="hero">
           <div className="logo" aria-label="끄투">
