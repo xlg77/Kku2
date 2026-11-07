@@ -5,6 +5,7 @@ import Account from './Account.jsx';
 import Leaderboard from './Leaderboard.jsx';
 import AdminPanel from './AdminPanel.jsx';
 import SettingsFields from './SettingsFields.jsx';
+import LineWaves from './LineWaves.jsx';
 import SwarmCursor from './SwarmCursor.jsx';
 import TechText from './TechText.jsx';
 import TargetCursor from './TargetCursor.jsx';
@@ -43,7 +44,9 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
   }
 
   return (
-    <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" className="lobby-swarm">
+    <div className="lobby-stage">
+      <LineWaves className="lobby-waves" />
+      <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" className="lobby-swarm">
       <TargetCursor targetSelector="button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), label, .cursor-target" />
       <main className="lobby">
         <header className="hero">
@@ -78,6 +81,7 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
           <p>영어 사전은 <a href="https://wordnet.princeton.edu/" target="_blank" rel="noreferrer">WordNet</a> 자료를 포함합니다. © Princeton University.</p>
         </footer>
       </main>
-    </SwarmCursor>
+      </SwarmCursor>
+    </div>
   );
 }
