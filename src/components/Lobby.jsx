@@ -7,6 +7,7 @@ import AdminPanel from './AdminPanel.jsx';
 import SettingsFields from './SettingsFields.jsx';
 import SwarmCursor from './SwarmCursor.jsx';
 import TechText from './TechText.jsx';
+import TargetCursor from './TargetCursor.jsx';
 import { MODES, cleanOpts } from '../engine/rules.js';
 import { unlockAudio } from '../sfx.js';
 
@@ -43,6 +44,7 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
 
   return (
     <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" className="lobby-swarm">
+      <TargetCursor targetSelector="button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), label, .cursor-target" />
       <main className="lobby">
         <header className="hero">
           <div className="logo-tech">
