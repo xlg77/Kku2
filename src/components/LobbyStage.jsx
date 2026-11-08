@@ -20,8 +20,9 @@ export default function LobbyStage({ children }) {
         brightness={0.58}
         highlight={0.35}
         warpIntensity={0.45}
-        enableMouseInteraction={false}
-        clickRipple={false}
+        enableMouseInteraction
+        mouseInfluence={0.85}
+        clickRipple
         intro={false}
         maxDevicePixelRatio={1.25}
       />
