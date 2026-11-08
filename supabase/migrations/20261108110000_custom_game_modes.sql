@@ -354,3 +354,17 @@ begin
  update public.custom_modes set updated_at=now() where id=p_mode;
  return jsonb_build_object('ok',true,'count',n);
 end $$;
+
+
+create or replace function public.kk_admin_mode_delete(p_token text,p_mode text)
+returns jsonb language plpgsql security definer set search_path to ''
+as $$
+declare v uuid:=kkutu_private.session_account(p_token);
+begin
+ if v is null or not exists(select 1 from kkutu_private.accounts a where a.id=v and a.is_admin) then return jsonb_build_object('error','forbidden'); end if;
+ if exists(select 1 from public.rooms r where r.status in ('waiting','playing') and r.settings->>'mode'=p_mode) then
+  return jsonb_build_object('error','mode_in_use');
+ end if;
+ delete from public.custom_modes where id=p_mode;
+ return jsonb_build_object('ok',true);
+end $$;
