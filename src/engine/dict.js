@@ -126,12 +126,12 @@ export function loadCustomModeDict(modeId, onProgress) {
         p_mode: modeId, p_after: after, p_limit: 40000,
       });
       if (e || !data || data.error) throw new Error('모드 단어장을 불러오지 못했어요.');
-      if (data.lines) { parts.push(data.lines); got += data.lines.split('\\n').length; }
+      if (data.lines) { parts.push(data.lines); got += data.lines.split('\n').length; }
       onProgress?.(Math.min(1, got / info.count));
       after=data.last;
       if (data.done) break;
     }
-    return new Dict(info.lang, parts.join('\\n'));
+    return new Dict(info.lang, parts.join('\n'));
   })();
   p.catch(() => customCache.delete(modeId));
   customCache.set(modeId,p);
