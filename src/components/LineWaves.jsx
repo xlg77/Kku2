@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import './LineWaves.css';
 
 const PIXEL_BUDGET = 1.35e6;
-const MAX_RIPPLES = 4;
+const MAX_RIPPLES = 3;
 
 const VERTEX = `#version 300 es
 const vec2 corners[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
@@ -102,8 +102,8 @@ void main() {
     float x = (length(p - rotate(ripple.xy, uRotation)) - ripple.z * 0.6) / 0.08;
     float fade = exp(-ripple.z * 1.3) * smoothstep(0.0, 0.12, ripple.z);
     float bump = exp(-x * x);
-    p.y -= x * bump * 0.07 * fade;
-    ring += bump * fade;
+    p.y -= x * bump * 0.045 * fade;
+    ring += bump * fade * 0.75;
   }
 
   float w = bend(p, t);
@@ -357,7 +357,7 @@ const LineWaves = ({
 
       for (let index = ripples.length - 1; index >= 0; index--) {
         ripples[index].age += dt;
-        if (ripples[index].age > 2.6) ripples.splice(index, 1);
+        if (ripples[index].age > 2.0) ripples.splice(index, 1);
       }
       rippleData.fill(0);
       ripples.forEach((ripple, index) => {
