@@ -19,7 +19,9 @@ export const loadSettings = () => {
 };
 
 export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersion }) {
-  const [s, setS] = useState(loadSettings);\n  const [customModes, setCustomModes] = useState([]);\n  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
+  const [s, setS] = useState(loadSettings);
+  const [customModes, setCustomModes] = useState([]);
+  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);\n  const [customModes, setCustomModes] = useState([]);\n  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
   useEffect(() => {
     const unlock = () => { void unlockAudio().catch(() => {}); };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
@@ -38,7 +40,7 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
       { id: 'me', name: auth.profile.nickname, bot: false },
       ...names.map((n, i) => ({ id: 'bot' + i, name: n, bot: true, level: s.level })),
     ];
-    const custom = customModes.find((m) => m.id === s.mode);\n    onStart({ mode: s.mode, baseMode: custom?.base_mode || s.mode, modeName: custom?.name, rounds: s.rounds, time: s.time, opts: cleanOpts(s.mode, s.opts), players });
+    const custom = customModes.find((m) => m.id === s.mode);\n    onStart({ mode: s.mode, baseMode: custom?.base_mode || s.mode, modeName: custom?.name, rounds: s.rounds, time: s.time, opts: cleanOpts(custom?.base_mode || s.mode, s.opts), players });
   }
 
   return (
