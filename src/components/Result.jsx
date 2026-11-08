@@ -10,7 +10,7 @@ export default function Result({ s, meId, record, onExit, onAgain, againLabel = 
   useEffect(() => {
     if (!record || once.current || !me) return;
     once.current = true; // StrictMode 에서도 한 번만 기록
-    recordGame({ mode: s.mode, score: me.score, rank: me.rank, players: rank.length }).then((err) => {
+    recordGame({ mode: s.baseMode || s.mode, score: me.score, rank: me.rank, players: rank.length }).then((err) => {
       setSaved(err ? 'error' : 'done');
       if (!err && onRecorded) onRecorded();
     });
