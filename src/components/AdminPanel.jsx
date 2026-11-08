@@ -36,7 +36,7 @@ export default function AdminPanel({ onModesChanged }) {
   async function onModeFile(e) {
     const f = e.target.files?.[0]; e.target.value = '';
     if (!f) return;
-    if (!/\\.txt$/i.test(f.name)) return setStatus('⚠️ 모드 단어장은 TXT 파일만 지원해요.');
+    if (!/\.txt$/i.test(f.name)) return setStatus('⚠️ 모드 단어장은 TXT 파일만 지원해요.');
     setModeText(await readDictText(f));
   }
   async function saveMode() {
