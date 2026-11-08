@@ -170,15 +170,17 @@ export async function saveCustomMode(mode) {
 }
 export async function uploadModeWords(modeId, rows, onProgress) {
   const CH = 1000;
+  let inserted = 0;
   for (let i = 0; i < rows.length; i += CH) {
     const { data, error } = await supabase.rpc('kk_admin_mode_words', {
       p_token: getToken(), p_mode: modeId, p_rows: rows.slice(i, i + CH),
     });
     if (error) return '서버 오류: ' + error.message;
     if (data?.error) return msg(data.error);
+    inserted += Number(data?.count || 0);
     onProgress?.(Math.min(i + CH, rows.length));
   }
-  return null;
+  return inserted ? null : '등록 가능한 단어를 찾지 못했어요. TXT 파일의 언어와 단어 형식을 확인해주세요.';
 }
 export async function deleteCustomMode(modeId) {
   const { data, error } = await supabase.rpc('kk_admin_mode_delete', { p_token: getToken(), p_mode: modeId });
