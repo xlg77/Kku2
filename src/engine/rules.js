@@ -72,7 +72,7 @@ export function entryDenied(e, opts) {
 // (char, sub) 로 이어질 수 있는 후보 단어들
 export function candidates(dict, mode, char, sub, opts, { exclude, wordLength, limit } = {}) {
   const out = [];
-  const lang = MODES[mode].lang;
+  const lang = MODES[mode]?.lang || 'ko';
   let pools;
   if (mode === 'KAP') pools = [dict.byLast.get(char), sub && dict.byLast.get(sub)];
   else if (mode === 'EKT' && char.length === 3) pools = [dict.byFirst.get(char[0]), dict.byFirst.get(char[1])];
@@ -104,7 +104,7 @@ export { shuffle };
 // 라운드 수와 정확히 같은 글자 수를 가진 실제 사전 단어를 제시어로 고른다.
 // 제시어 자체를 화면에 공개하지 않고, 각 라운드에 해당 글자만 순서대로 제시한다.
 export function makeTitle(dict, mode, rounds, opts) {
-  const lang = MODES[mode].lang;
+  const lang = MODES[mode]?.lang || 'ko';
   const length = Math.max(1, Math.floor(Number(rounds) || 1));
   const wordLength = mode === 'KKT' ? 3 : 0;
   const pool = [];
