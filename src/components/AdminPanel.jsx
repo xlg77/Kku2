@@ -16,7 +16,6 @@ export default function AdminPanel() {
   const [modeBase, setModeBase] = useState('KSH');
   const [modePublic, setModePublic] = useState(true);
   const [modeText, setModeText] = useState('');
-  const [modeSkipped, setModeSkipped] = useState([]);
   const modeLang = ['ESH','EKT'].includes(modeBase) ? 'en' : 'ko';
   const modeParsed = useMemo(() => parseWords(modeText, modeLang), [modeText, modeLang]);
   const refreshModes = () => fetchAdminModes().then(setModes).catch((e) => setStatus('⚠️ 모드 목록을 불러오지 못했어요: ' + e.message));
@@ -38,7 +37,7 @@ export default function AdminPanel() {
     const f = e.target.files?.[0]; e.target.value = '';
     if (!f) return;
     if (!/\\.txt$/i.test(f.name)) return setStatus('⚠️ 모드 단어장은 TXT 파일만 지원해요.');
-    setModeText(await f.text());
+    setModeText(await readDictText(f));
   }
   async function saveMode() {
     if (!modeName.trim() || (!modeId && !modeParsed.rows.length)) return setStatus('⚠️ 모드 이름과 유효한 TXT 단어장이 필요해요.');
@@ -46,12 +45,12 @@ export default function AdminPanel() {
     const saved = await saveCustomMode({ id: modeId, name: modeName, description: modeDescription, base_mode: modeBase, is_public: false });
     if (saved.error) { setBusy(false); return setStatus('⚠️ ' + saved.error); }
     setModeId(saved.id);
-    const err = await uploadModeWords(saved.id, modeParsed.rows, (n) => setStatus(`모드 단어 등록 중… ${n}/${modeParsed.rows.length}`));
+    const err = modeParsed.rows.length ? await uploadModeWords(saved.id, modeParsed.rows, (n) => setStatus(`모드 단어 등록 중… ${n}/${modeParsed.rows.length}`)) : null;
     if (err) { setBusy(false); return setStatus('⚠️ 모드는 저장됐지만 단어 등록에 실패했어요: ' + err); }
     const published = await saveCustomMode({ id: saved.id, name: modeName, description: modeDescription, base_mode: modeBase, is_public: modePublic });
     setBusy(false);
     if (published.error) return setStatus('⚠️ 단어는 등록됐지만 공개 설정에 실패했어요: ' + published.error);
-    setStatus(`✅ 모드 “${modeName}” 저장 완료 · 단어 ${modeParsed.rows.length}개`);
+    setStatus(`✅ 모드 “${modeName}” 저장 완료${modeParsed.rows.length ? ` · 단어 ${modeParsed.rows.length}개 추가` : ''}`);
     setModeText(''); resetModeForm(); refreshModes();
   }
   async function removeMode(id) {
