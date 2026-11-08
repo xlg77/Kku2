@@ -325,7 +325,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
       </section>
 
       <form className={'dock' + (myTurn ? ' on' : '') + (allowPrediction && !myTurn && (s.phase === 'turn' || s.phase === 'turnResult') ? ' predicting' : '')} onSubmit={submit}>
-        <p className={'msg' + (msg ? ' show' : '')} key={shake} role="status">{msg || (myTurn ? ERR.chain(s) : allowPrediction && s.phase === 'turnResult' ? '다음 글자 공개 중! 지금 Enter를 누르세요.' : allowPrediction && s.phase === 'turn' ? '상대 차례예요. 단어를 미리 입력하고 글자가 공개될 때 Enter를 누르세요.' : ' ')}</p>
+        <p className={'msg' + (msg ? ' show' : '')} key={shake} role="status">{msg || (myTurn ? ERR.chain({ ...s, mode: baseMode }) : allowPrediction && s.phase === 'turnResult' ? '다음 글자 공개 중! 지금 Enter를 누르세요.' : allowPrediction && s.phase === 'turn' ? '상대 차례예요. 단어를 미리 입력하고 글자가 공개될 때 Enter를 누르세요.' : ' ')}</p>
         <div className="row">
           <input
             ref={input} className="text big-input" value={text} onChange={(e) => { setText(e.target.value); if (!myTurn) setMsg(''); }}
