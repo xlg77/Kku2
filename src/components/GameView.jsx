@@ -120,7 +120,7 @@ const ERR = {
  * 게임 화면. store(subscribe/getSnapshot)가 주는 스냅샷만 그린다.
  * 혼자 하기: store = Game, 멀티플레이: store = 방장이 보내준 상태. submit(text) → Promise<{ok, code}>
  */
-export default function GameView({ store, meId, submit: submitFn, record, onExit, onAgain, againLabel, onRecorded, allowPrediction = false }) {
+export default function GameView({ store, meId, submit: submitFn, record, onExit, onAgain, againLabel, onRecorded, allowPrediction = false, customModes = [] }) {
   const s = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [muted, setM] = useState(isMuted());
   const [shake, setShake] = useState(0);
@@ -133,7 +133,10 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
   const input = useRef(null);
   const histRef = useRef(null);
   const prevLast = useRef(0);
-  const mode = MODES[s?.mode || 'KSH'];
+  const customMode = customModes.find((m) => m.id === s?.mode);
+  const baseMode = s?.baseMode || customMode?.base_mode || s?.mode || 'KSH';
+  const mode = MODES[baseMode] || MODES.KSH;
+  const modeName = customMode?.name || s?.modeName || mode.name;
 
   // 화면이 전환되거나 컴포넌트가 사라질 때 예약된 해골 표시 타이머를 정리한다.
   useEffect(() => () => {
@@ -210,7 +213,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
     const r = await submitFn(word);
     if (r.ok) { setText(''); setMsg(predicted ? '⚡ 예측샷 성공! 먼저 준비한 단어가 제출됐어요.' : ''); return; }
     if (r.code === 'empty' || r.code === 'turn' || r.code === 'phase') return;
-    const m = (ERR[r.code] || (() => '사용할 수 없는 단어예요'))(store.getSnapshot() || s);
+    const m = (ERR[r.code] || (() => '사용할 수 없는 단어예요'))({ ...(store.getSnapshot() || s), mode: baseMode });
     setMsg((predicted ? '예측샷 실패 · ' : '') + m);
     setShake((n) => n + 1); sfx.bad();
     if (!predicted) input.current?.select();
@@ -221,7 +224,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
     const word = text.trim();
     if (!myTurn) {
       if (allowPrediction && s.phase === 'turnResult' && word) {
-        if (!isChainable(s.mode, word, s.char, s.subChar, s.mode === 'KKT' ? 3 : 0)) {
+        if (!isChainable(baseMode, word, s.char, s.subChar, baseMode === 'KKT' ? 3 : 0)) {
           setMsg('예측 실패 · 공개된 글자에 맞는 단어가 아니에요.');
           setShake((n) => n + 1);
           sfx.bad();
@@ -257,7 +260,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
       <header className="topbar">
         <button className="ghost" onClick={() => { if (confirm('게임을 나갈까요?')) onExit(); }} aria-label="나가기">← 나가기</button>
         <div className="top-info">
-          <b>{mode.name}</b>
+          <b>{modeName}</b>
           <span>라운드 {Math.min(s.round || 1, s.rounds)}/{s.rounds}</span>
           <span>연결 {chain.length}</span>
         </div>
@@ -280,7 +283,7 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
             <div className="charbox" key={s.char + chain.length}>
               <span className="big">{mode.lang === 'en' ? s.char.toUpperCase() : s.char}</span>
               {s.subChar && <span className="sub-char">{s.subChar}</span>}
-              <span className="dir">{s.mode === 'KAP' ? '(으)로 끝나는' : '(으)로 시작하는'}{s.mode === 'KKT' ? ' 3글자' : ''}</span>
+              <span className="dir">{baseMode === 'KAP' ? '(으)로 끝나는' : '(으)로 시작하는'}{baseMode === 'KKT' ? ' 3글자' : ''}</span>
             </div>
             {s.mission && s.mission !== true && <div className="mission">미션 <b>{s.mission}</b></div>}
             {roundEnd && (
