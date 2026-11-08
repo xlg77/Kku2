@@ -22,7 +22,7 @@ export const loadSettings = () => {
 export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersion }) {
   const [s, setS] = useState(loadSettings);
   const [customModes, setCustomModes] = useState([]);
-  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
+  useEffect(() => { fetchCustomModes().then((modes) => { setCustomModes(modes); if (String(s.mode).startsWith('CM') && !modes.some((m) => m.id === s.mode)) setS((p) => ({ ...p, mode: 'KSH' })); }).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
   useEffect(() => {
     const unlock = () => { void unlockAudio().catch(() => {}); };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
