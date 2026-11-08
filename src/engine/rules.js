@@ -112,9 +112,10 @@ export function makeTitle(dict, mode, rounds, opts) {
   // 무작위 초성만 반복 탐색하다가 '가나다...' 같은 가짜 글자로 대체하던 기존 방식을 제거한다.
   // 실제로 로드된 사전 전체에서 라운드 수와 글자 수가 일치하는 단어만 찾는다.
   for (const entry of dict.words.values()) {
-    const letters = Array.from(entry.w || '');
-    if (letters.length !== length) continue;
-    if (lang === 'ko' && entryDenied(entry, opts)) continue;
+    const full = Array.from(entry.w || '');
+    const letters = length === 1 ? full.slice(0, 1) : full;
+    if (length !== 1 && letters.length !== length) continue;
+    if (!letters.length || (lang === 'ko' && entryDenied(entry, opts))) continue;
 
     const usable = letters.every((char) => (
       candidates(dict, mode, char, getSubChar(mode, char), opts, {
@@ -122,7 +123,7 @@ export function makeTitle(dict, mode, rounds, opts) {
         wordLength,
       }).length > 0
     ));
-    if (usable) pool.push(entry.w);
+    if (usable) pool.push(length === 1 ? letters[0] : entry.w);
   }
 
   if (!pool.length) {
@@ -134,4 +135,4 @@ export function makeTitle(dict, mode, rounds, opts) {
 }
 
 export const cleanOpts = (modeKey, opts) =>
-  Object.fromEntries(Object.keys(OPT_LABELS).map((k) => [k, MODES[modeKey].opts.includes(k) && !!opts[k]]));
+  Object.fromEntries(Object.keys(OPT_LABELS).map((k) => [k, (MODES[modeKey]?.opts || []).includes(k) && !!opts[k]]));
