@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { parseWords } from '../engine/customWords.js';
-import { countCustomWords, uploadCustomWords, deleteCustomWord, putDictFile } from '../auth.js';
+import { countCustomWords, uploadCustomWords, deleteCustomWord, putDictFile, fetchAdminModes, saveCustomMode, uploadModeWords, deleteCustomMode } from '../auth.js';
 
 export default function AdminPanel() {
   const [text, setText] = useState('');
@@ -9,11 +9,58 @@ export default function AdminPanel() {
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState('');
+  const [modes, setModes] = useState([]);
+  const [modeId, setModeId] = useState('');
+  const [modeName, setModeName] = useState('');
+  const [modeDescription, setModeDescription] = useState('');
+  const [modeBase, setModeBase] = useState('KSH');
+  const [modePublic, setModePublic] = useState(true);
+  const [modeText, setModeText] = useState('');
+  const [modeSkipped, setModeSkipped] = useState([]);
+  const modeLang = ['ESH','EKT'].includes(modeBase) ? 'en' : 'ko';
+  const modeParsed = useMemo(() => parseWords(modeText, modeLang), [modeText, modeLang]);
+  const refreshModes = () => fetchAdminModes().then(setModes).catch((e) => setStatus('⚠️ 모드 목록을 불러오지 못했어요: ' + e.message));
   const parsed = useMemo(() => parseWords(text, lang), [text, lang]);
 
   const refresh = () => countCustomWords().then(setTotal).catch(() => setTotal(null));
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); refreshModes(); }, []);
 
+  function editMode(m) {
+    setModeId(m.id); setModeName(m.name); setModeDescription(m.description || '');
+    setModeBase(m.base_mode); setModePublic(!!m.is_public); setModeText('');
+    setStatus('모드 설정을 수정 중이에요. 단어 파일을 추가로 올릴 수도 있어요.');
+  }
+  function resetModeForm() {
+    setModeId(''); setModeName(''); setModeDescription('');
+    setModeBase('KSH'); setModePublic(true); setModeText('');
+  }
+  async function onModeFile(e) {
+    const f = e.target.files?.[0]; e.target.value = '';
+    if (!f) return;
+    if (!/\\.txt$/i.test(f.name)) return setStatus('⚠️ 모드 단어장은 TXT 파일만 지원해요.');
+    setModeText(await f.text());
+  }
+  async function saveMode() {
+    if (!modeName.trim() || !modeParsed.rows.length) return setStatus('⚠️ 모드 이름과 유효한 TXT 단어장이 필요해요.');
+    setBusy(true); setStatus('모드 저장 중…');
+    const saved = await saveCustomMode({ id: modeId, name: modeName, description: modeDescription, base_mode: modeBase, is_public: false });
+    if (saved.error) { setBusy(false); return setStatus('⚠️ ' + saved.error); }
+    setModeId(saved.id);
+    const err = await uploadModeWords(saved.id, modeParsed.rows, (n) => setStatus(`모드 단어 등록 중… ${n}/${modeParsed.rows.length}`));
+    if (err) { setBusy(false); return setStatus('⚠️ 모드는 저장됐지만 단어 등록에 실패했어요: ' + err); }
+    const published = await saveCustomMode({ id: saved.id, name: modeName, description: modeDescription, base_mode: modeBase, is_public: modePublic });
+    setBusy(false);
+    if (published.error) return setStatus('⚠️ 단어는 등록됐지만 공개 설정에 실패했어요: ' + published.error);
+    setStatus(`✅ 모드 “${modeName}” 저장 완료 · 단어 ${modeParsed.rows.length}개`);
+    setModeText(''); resetModeForm(); refreshModes();
+  }
+  async function removeMode(id) {
+    if (!confirm('이 모드와 전용 단어장을 모두 삭제할까요?')) return;
+    const err = await deleteCustomMode(id);
+    if (err) return setStatus('⚠️ ' + err);
+    setStatus('🗑️ 모드를 삭제했어요.'); refreshModes();
+    if (modeId === id) resetModeForm();
+  }
   async function onFile(e) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -66,7 +113,39 @@ export default function AdminPanel() {
 
   return (
     <section className="panel admin">
-      <h2>🔧 관리자: 단어 올리기 <small>DB 사전 {total ?? '?'}개</small></h2>
+      <h2>🔧 관리자 도구 <small>DB 사전 {total ?? '?'}개</small></h2>
+      <div className="admin-dict">
+        <h3 className="h2">🎮 사용자 제작 게임 모드</h3>
+        <p className="note">기존 규칙을 골라 전용 단어장을 가진 모드를 만들어요. TXT는 한 줄에 단어 하나씩 넣어주세요.</p>
+        <div className="field">
+          <label className="field-label">모드 이름</label>
+          <input className="text" value={modeName} maxLength={24} onChange={(e) => setModeName(e.target.value)} placeholder="예: 동물 이름 끝말잇기" />
+        </div>
+        <div className="field">
+          <label className="field-label">설명</label>
+          <input className="text" value={modeDescription} maxLength={120} onChange={(e) => setModeDescription(e.target.value)} placeholder="모드 설명" />
+        </div>
+        <div className="field">
+          <span className="field-label">적용할 기본 규칙</span>
+          <div className="seg">
+            {Object.entries({KSH:'끝말잇기',KKT:'쿵쿵따',KAP:'앞말잇기',ESH:'영어 끝말잇기',EKT:'영어 3글자'}).map(([v,n]) => <button type="button" key={v} className={modeBase===v?'on':''} onClick={() => setModeBase(v)}>{n}</button>)}
+          </div>
+        </div>
+        <label className="check"><input type="checkbox" checked={modePublic} onChange={(e) => setModePublic(e.target.checked)} /> 저장 후 사용자에게 공개</label>
+        <label className="ghost filebtn">전용 TXT 단어장 선택<input type="file" accept=".txt,text/plain" onChange={onModeFile} hidden /></label>
+        <p className="note">유효 단어 {modeParsed.rows.length}개{modeParsed.skipped.length ? ` · 제외 ${modeParsed.skipped.length}개` : ''} · {modeLang === 'ko' ? '한국어' : '영어'}</p>
+        <div className="admin-row">
+          <button className="go" type="button" disabled={busy || !modeName.trim() || !modeParsed.rows.length} onClick={saveMode}>{busy ? '저장 중…' : modeId ? '모드 수정 및 단어 추가' : '모드 생성'}</button>
+          {modeId && <button className="ghost" type="button" onClick={resetModeForm}>취소</button>}
+        </div>
+        {modes.length > 0 && <div className="mode-list">
+          {modes.map((m) => <div className="admin-row" key={m.id}>
+            <span><b>{m.name}</b><small>{m.count.toLocaleString()}개 · {m.is_public ? '공개' : '비공개'}</small></span>
+            <button className="ghost" type="button" onClick={() => editMode(m)}>수정</button>
+            <button className="ghost" type="button" onClick={() => removeMode(m.id)}>삭제</button>
+          </div>)}
+        </div>}
+      </div>
       <p className="note">멀티플레이 사전 파일은 TXT만 지원해요. 일반 단어 목록은 한 줄에 단어 하나씩 저장한 TXT를 선택하세요.</p>
       <div className="admin-dict">
         <h3 className="h2">📚 멀티플레이 사전 통째로 올리기</h3>
