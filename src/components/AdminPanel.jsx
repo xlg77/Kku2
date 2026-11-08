@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { parseWords } from '../engine/customWords.js';
 import { countCustomWords, uploadCustomWords, deleteCustomWord, putDictFile, fetchAdminModes, saveCustomMode, uploadModeWords, deleteCustomMode } from '../auth.js';
 
-export default function AdminPanel() {
+export default function AdminPanel({ onModesChanged }) {
   const [text, setText] = useState('');
   const [lang, setLang] = useState('');
   const [total, setTotal] = useState(null);
@@ -51,13 +51,13 @@ export default function AdminPanel() {
     setBusy(false);
     if (published.error) return setStatus('⚠️ 단어는 등록됐지만 공개 설정에 실패했어요: ' + published.error);
     setStatus(`✅ 모드 “${modeName}” 저장 완료${modeParsed.rows.length ? ` · 단어 ${modeParsed.rows.length}개 추가` : ''}`);
-    setModeText(''); resetModeForm(); refreshModes();
+    setModeText(''); resetModeForm(); refreshModes(); onModesChanged?.();
   }
   async function removeMode(id) {
     if (!confirm('이 모드와 전용 단어장을 모두 삭제할까요?')) return;
     const err = await deleteCustomMode(id);
     if (err) return setStatus('⚠️ ' + err);
-    setStatus('🗑️ 모드를 삭제했어요.'); refreshModes();
+    setStatus('🗑️ 모드를 삭제했어요.'); refreshModes(); onModesChanged?.();
     if (modeId === id) resetModeForm();
   }
   async function onFile(e) {
