@@ -3,7 +3,8 @@ import { MODES, BOT_LEVELS } from '../engine/rules.js';
 import SettingsFields from './SettingsFields.jsx';
 import GameView from './GameView.jsx';
 import LobbyStage from './LobbyStage.jsx';
-import { unlockAudio } from '../sfx.js';\nimport { fetchCustomModes } from '../auth.js';
+import { unlockAudio } from '../sfx.js';
+import { fetchCustomModes } from '../auth.js';
 
 export default function RoomView({ session, meId, onLeave }) {
   const st = useSyncExternalStore(session.subscribe, session.getState);
@@ -11,7 +12,9 @@ export default function RoomView({ session, meId, onLeave }) {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState('');
   const [customModes, setCustomModes] = useState([]);
-  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);\n  const [customModes, setCustomModes] = useState([]);\n  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
+  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
+  const [customModes, setCustomModes] = useState([]);
+  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
   useEffect(() => {
     const unlock = () => { void unlockAudio().catch(() => {}); };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
@@ -37,7 +40,8 @@ export default function RoomView({ session, meId, onLeave }) {
   }
 
   const s = st.settings;
-  const customMode = customModes.find((m) => m.id === s.mode);\n  const mode = MODES[customMode?.base_mode || s.mode] || MODES.KSH;
+  const customMode = customModes.find((m) => m.id === s.mode);
+  const mode = MODES[customMode?.base_mode || s.mode] || MODES.KSH;
   const total = st.members.length + Math.min(s.bots, st.max - st.members.length);
   const start = async () => { void unlockAudio().catch((error) => console.warn('[Kku2] 방 게임 시작 시 오디오 활성화 실패:', error)); setStarting(true); setStartError(''); try { const result = await session.startGame(); if (!result?.ok) setStartError(result?.error || '게임을 시작하지 못했어요.'); } catch (error) { setStartError(error?.message || '게임을 시작하지 못했어요.'); } finally { setStarting(false); } };
 
