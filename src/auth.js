@@ -142,3 +142,44 @@ export async function putDictFile(lang, text, format, replace, onProgress) {
   if (!inserted) return '서버에 등록된 단어가 0개예요. 파일 형식을 확인해주세요.';
   return { count: inserted, valid: validCount, total: lines.length };
 }
+
+
+/** 공개된 사용자 제작 모드 */
+export async function fetchCustomModes() {
+  const { data, error } = await supabase.rpc('kk_modes_list');
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+export async function fetchAdminModes() {
+  const { data, error } = await supabase.rpc('kk_admin_modes_list', { p_token: getToken() });
+  if (error) throw error;
+  if (data?.error) throw new Error(msg(data.error));
+  return Array.isArray(data) ? data : [];
+}
+export async function saveCustomMode(mode) {
+  const { data, error } = await supabase.rpc('kk_admin_mode_save', {
+    p_token: getToken(), p_id: mode.id || null, p_name: mode.name,
+    p_description: mode.description || '', p_base_mode: mode.base_mode,
+    p_is_public: !!mode.is_public,
+  });
+  if (error) return { error: '서버 오류: ' + error.message };
+  if (data?.error) return { error: msg(data.error) };
+  return { id: data.id };
+}
+export async function uploadModeWords(modeId, rows, onProgress) {
+  const CH = 1000;
+  for (let i = 0; i < rows.length; i += CH) {
+    const { data, error } = await supabase.rpc('kk_admin_mode_words', {
+      p_token: getToken(), p_mode: modeId, p_rows: rows.slice(i, i + CH),
+    });
+    if (error) return '서버 오류: ' + error.message;
+    if (data?.error) return msg(data.error);
+    onProgress?.(Math.min(i + CH, rows.length));
+  }
+  return null;
+}
+export async function deleteCustomMode(modeId) {
+  const { data, error } = await supabase.rpc('kk_admin_mode_delete', { p_token: getToken(), p_mode: modeId });
+  if (error) return '서버 오류: ' + error.message;
+  return data?.error ? msg(data.error) : null;
+}
