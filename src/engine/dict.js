@@ -110,3 +110,30 @@ export function loadDict(lang, onProgress, supabase) {
   cache.set(lang, p);
   return p;
 }
+
+
+const customCache = new Map();
+/** 모드 전용 단어장: 공개 모드 RPC에서 같은 Dict 형식으로 페이지를 읽는다. */
+export function loadCustomModeDict(modeId, onProgress) {
+  if (customCache.has(modeId)) return customCache.get(modeId);
+  const p = (async () => {
+    const { data: info, error } = await (await import('../supabase.js')).supabase.rpc('kk_custom_dict_info', { p_mode: modeId });
+    if (error || !info || info.error) throw new Error('사용자 제작 모드 사전을 불러오지 못했어요.');
+    if (!info.count) throw new Error('이 모드에는 아직 단어가 등록되지 않았어요.');
+    const parts=[]; let after=''; let got=0;
+    for (;;) {
+      const { data, error: e } = await (await import('../supabase.js')).supabase.rpc('kk_custom_dict_chunk', {
+        p_mode: modeId, p_after: after, p_limit: 40000,
+      });
+      if (e || !data || data.error) throw new Error('모드 단어장을 불러오지 못했어요.');
+      if (data.lines) { parts.push(data.lines); got += data.lines.split('\\n').length; }
+      onProgress?.(Math.min(1, got / info.count));
+      after=data.last;
+      if (data.done) break;
+    }
+    return new Dict(info.lang, parts.join('\\n'));
+  })();
+  p.catch(() => customCache.delete(modeId));
+  customCache.set(modeId,p);
+  return p;
+}
