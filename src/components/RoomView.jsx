@@ -9,7 +9,9 @@ export default function RoomView({ session, meId, onLeave }) {
   const st = useSyncExternalStore(session.subscribe, session.getState);
   const [text, setText] = useState('');
   const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState('');\n  const [customModes, setCustomModes] = useState([]);\n  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
+  const [startError, setStartError] = useState('');
+  const [customModes, setCustomModes] = useState([]);
+  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);\n  const [customModes, setCustomModes] = useState([]);\n  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
   useEffect(() => {
     const unlock = () => { void unlockAudio().catch(() => {}); };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
