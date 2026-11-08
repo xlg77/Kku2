@@ -332,3 +332,15 @@ body { overflow-x: clip; }
 .lobby-stage .rank li.me, .lobby-stage .members li.me { color: #5d4a17; }
 .lobby-stage .rank li.me small { color: #806b37; }
 .lobby-stage .members li.me small { color: #3b4658; }
+
+
+/* 텍스트 선택 시 기본 파란색 대신 어두운 청록색 강조 */
+::selection {
+  background: #164b4b;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+::-moz-selection {
+  background: #164b4b;
+  color: #ffffff;
+}
