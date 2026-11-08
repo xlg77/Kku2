@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import './LineWaves.css';
 
-const PIXEL_BUDGET = 2.4e6;
+const PIXEL_BUDGET = 1.35e6;
 const MAX_RIPPLES = 4;
 
 const VERTEX = `#version 300 es
