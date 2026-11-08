@@ -4,7 +4,7 @@ import SinglePlay from './components/SinglePlay.jsx';
 import RoomList from './components/RoomList.jsx';
 import RoomView from './components/RoomView.jsx';
 import AuthScreen from './components/AuthScreen.jsx';
-import { loadDict } from './engine/dict.js';
+import { loadDict, loadCustomModeDict } from './engine/dict.js';
 import { MODES, makeTitle } from './engine/rules.js';
 import { useAuth } from './auth.js';
 import { supabase } from './supabase.js';
@@ -39,7 +39,7 @@ export default function App() {
     try {
       const dict = await dictFor(MODES[cfg.mode].lang, (pct) => setLoading({ pct }));
       const title = makeTitle(dict, cfg.mode, cfg.rounds, cfg.opts || {});
-      setScreen({ name: 'game', cfg: { ...cfg, dict, title }, key: Date.now() });
+      setScreen({ name: 'game', cfg: { ...cfg, baseMode, dict, title }, key: Date.now() });
     } catch (e) {
       setError(String(e.message || e));
     } finally {
