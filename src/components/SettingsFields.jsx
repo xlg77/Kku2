@@ -23,8 +23,9 @@ export default function SettingsFields({ s, set, minBots = 1, maxBots = 7, disab
       <div className="field">
         <span className="field-label">게임 모드</span>
         <div className="modes" role="radiogroup" aria-label="게임 모드">
-          {Object.entries(MODES).map(([k, m]) => (
-            <button type="button" key={k} role="radio" aria-checked={s.mode === k} disabled={disabled} className={'mode' + (s.mode === k ? ' on' : '')} onClick={() => set({ mode: k })}>
+          {[...Object.entries(MODES).map(([k, m]) => ({ id: k, ...m })), ...customModes.map((m) => ({ id: m.id, name: m.name, desc: m.description || '사용자 제작 단어장', lang: m.lang, opts: MODES[m.base_mode]?.opts || [] }))].map((m) => (
+
+            <button type="button" key={m.id} role="radio" aria-checked={s.mode === m.id} disabled={disabled} className={'mode' + (s.mode === k ? ' on' : '')} onClick={() => set({ mode: m.id })}>
               <b>{m.name}</b>
               <small>{m.desc}</small>
             </button>
