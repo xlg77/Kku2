@@ -1,5 +1,7 @@
 // 단어 사전: public/data/{ko,en}.txt 를 받아 인덱스를 만든다.
 // ko 줄 형식: <단어><flag 1자><strict 0/1><hit 0-9>   en 줄 형식: <word><hit 0-9>
+import { supabase } from '../supabase.js';
+
 const B = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-';
 
 export class Dict {
@@ -114,26 +116,30 @@ export function loadDict(lang, onProgress, supabase) {
 
 const customCache = new Map();
 /** 모드 전용 단어장: 공개 모드 RPC에서 같은 Dict 형식으로 페이지를 읽는다. */
-export function loadCustomModeDict(modeId, onProgress) {
-  if (customCache.has(modeId)) return customCache.get(modeId);
+export async function loadCustomModeDict(modeId, onProgress) {
+  const { data: info, error } = await supabase.rpc('kk_custom_dict_info', { p_mode: modeId });
+  if (error || !info || info.error) throw new Error('사용자 제작 모드 사전을 불러오지 못했어요.');
+  if (!info.count) throw new Error('이 모드에는 아직 단어가 등록되지 않았어요.');
+  const cacheKey = `${modeId}:${info.updated_at || ''}:${info.count}`;
+  if (customCache.has(cacheKey)) return customCache.get(cacheKey);
+  for (const key of customCache.keys()) {
+    if (key.startsWith(`${modeId}:`) && key !== cacheKey) customCache.delete(key);
+  }
   const p = (async () => {
-    const { data: info, error } = await (await import('../supabase.js')).supabase.rpc('kk_custom_dict_info', { p_mode: modeId });
-    if (error || !info || info.error) throw new Error('사용자 제작 모드 사전을 불러오지 못했어요.');
-    if (!info.count) throw new Error('이 모드에는 아직 단어가 등록되지 않았어요.');
-    const parts=[]; let after=''; let got=0;
+    const parts = []; let after = ''; let got = 0;
     for (;;) {
-      const { data, error: e } = await (await import('../supabase.js')).supabase.rpc('kk_custom_dict_chunk', {
+      const { data, error: e } = await supabase.rpc('kk_custom_dict_chunk', {
         p_mode: modeId, p_after: after, p_limit: 40000,
       });
       if (e || !data || data.error) throw new Error('모드 단어장을 불러오지 못했어요.');
-      if (data.lines) { parts.push(data.lines); got += data.lines.split('\n').length; }
+      if (data.lines) { parts.push(data.lines); got += data.lines.split('\\n').length; }
       onProgress?.(Math.min(1, got / info.count));
-      after=data.last;
+      after = data.last;
       if (data.done) break;
     }
-    return new Dict(info.lang, parts.join('\n'));
+    return new Dict(info.lang, parts.join('\\n'));
   })();
-  p.catch(() => customCache.delete(modeId));
-  customCache.set(modeId,p);
+  p.catch(() => customCache.delete(cacheKey));
+  customCache.set(cacheKey, p);
   return p;
 }
