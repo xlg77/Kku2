@@ -16,7 +16,7 @@ const ERRORS = {
   too_many: '시도가 너무 많아요. 잠시 후 다시 해주세요',
   bad_input: '입력값을 확인해주세요',
   unauthorized: '로그인이 만료됐어요. 다시 로그인해주세요',
-  forbidden: '관리자만 할 수 있어요',
+  forbidden: '관리자만 할 수 있어요',\n  mode_language_locked: '단어가 등록된 모드는 언어가 다른 규칙으로 변경할 수 없어요. 새 모드를 만들어주세요.',
 };
 const msg = (e) => ERRORS[e] || '오류: ' + e;
 
