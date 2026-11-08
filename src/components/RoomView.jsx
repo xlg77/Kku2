@@ -3,13 +3,13 @@ import { MODES, BOT_LEVELS } from '../engine/rules.js';
 import SettingsFields from './SettingsFields.jsx';
 import GameView from './GameView.jsx';
 import LobbyStage from './LobbyStage.jsx';
-import { unlockAudio } from '../sfx.js';
+import { unlockAudio } from '../sfx.js';\nimport { fetchCustomModes } from '../auth.js';
 
 export default function RoomView({ session, meId, onLeave }) {
   const st = useSyncExternalStore(session.subscribe, session.getState);
   const [text, setText] = useState('');
   const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState('');
+  const [startError, setStartError] = useState('');\n  const [customModes, setCustomModes] = useState([]);\n  useEffect(() => { fetchCustomModes().then(setCustomModes).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
   useEffect(() => {
     const unlock = () => { void unlockAudio().catch(() => {}); };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
@@ -28,14 +28,14 @@ export default function RoomView({ session, meId, onLeave }) {
 
   if (st.phase !== 'waiting') {
     return (
-      <GameView store={session.store} meId={meId} submit={session.submit} record={false} allowPrediction
+      <GameView store={session.store} meId={meId} submit={session.submit} record={false} allowPrediction customModes={customModes}
         onExit={onLeave} onAgain={isHost ? () => session.resetToWaiting() : undefined} againLabel="대기실로"
       />
     );
   }
 
   const s = st.settings;
-  const mode = MODES[s.mode];
+  const customMode = customModes.find((m) => m.id === s.mode);\n  const mode = MODES[customMode?.base_mode || s.mode] || MODES.KSH;
   const total = st.members.length + Math.min(s.bots, st.max - st.members.length);
   const start = async () => { void unlockAudio().catch((error) => console.warn('[Kku2] 방 게임 시작 시 오디오 활성화 실패:', error)); setStarting(true); setStartError(''); try { const result = await session.startGame(); if (!result?.ok) setStartError(result?.error || '게임을 시작하지 못했어요.'); } catch (error) { setStartError(error?.message || '게임을 시작하지 못했어요.'); } finally { setStarting(false); } };
 
@@ -64,7 +64,7 @@ export default function RoomView({ session, meId, onLeave }) {
         {isHost ? (
           <section className="panel">
             <h2 className="h2">게임 설정</h2>
-            <SettingsFields s={s} set={(p) => session.updateSettings(p)} minBots={0} maxBots={st.max - st.members.length} />
+            <SettingsFields s={s} set={(p) => session.updateSettings(p)} minBots={0} maxBots={st.max - st.members.length} customModes={customModes} />
             {startError && <p className="error" role="alert">{startError}</p>}
             <button className="go" onClick={start} disabled={starting || !session.canStart()}>
               {starting ? '시작하는 중…' : session.canStart() ? `게임 시작 (${total}명)` : '2명 이상이어야 시작할 수 있어요 (봇을 추가해도 돼요)'}
@@ -73,7 +73,7 @@ export default function RoomView({ session, meId, onLeave }) {
         ) : (
           <section className="panel">
             <h2 className="h2">게임 설정 <small>방장이 정해요</small></h2>
-            <p className="summary"><b>{mode.name}</b> · {s.rounds}라운드 · {s.time}초 · 봇 {s.bots}명{s.bots > 0 ? `(${BOT_LEVELS[s.level]})` : ''}</p>
+            <p className="summary"><b>{customMode?.name || mode.name}</b> · {s.rounds}라운드 · {s.time}초 · 봇 {s.bots}명{s.bots > 0 ? `(${BOT_LEVELS[s.level]})` : ''}</p>
             <small>방장이 시작하면 게임이 열려요…</small>
           </section>
         )}
