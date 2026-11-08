@@ -18,6 +18,7 @@ const ERRORS = {
   unauthorized: '로그인이 만료됐어요. 다시 로그인해주세요',
   forbidden: '관리자만 할 수 있어요',
   mode_language_locked: '단어가 등록된 모드는 언어가 다른 규칙으로 변경할 수 없어요. 새 모드를 만들어주세요.',
+  mode_in_use: '현재 대기 중이거나 진행 중인 방에서 사용 중이라 삭제할 수 없어요.',
 };
 const msg = (e) => ERRORS[e] || '오류: ' + e;
 
