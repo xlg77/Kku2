@@ -41,7 +41,7 @@ export default function AdminPanel() {
     setModeText(await f.text());
   }
   async function saveMode() {
-    if (!modeName.trim() || !modeParsed.rows.length) return setStatus('⚠️ 모드 이름과 유효한 TXT 단어장이 필요해요.');
+    if (!modeName.trim() || (!modeId && !modeParsed.rows.length)) return setStatus('⚠️ 모드 이름과 유효한 TXT 단어장이 필요해요.');
     setBusy(true); setStatus('모드 저장 중…');
     const saved = await saveCustomMode({ id: modeId, name: modeName, description: modeDescription, base_mode: modeBase, is_public: false });
     if (saved.error) { setBusy(false); return setStatus('⚠️ ' + saved.error); }
@@ -135,7 +135,7 @@ export default function AdminPanel() {
         <label className="ghost filebtn">전용 TXT 단어장 선택<input type="file" accept=".txt,text/plain" onChange={onModeFile} hidden /></label>
         <p className="note">유효 단어 {modeParsed.rows.length}개{modeParsed.skipped.length ? ` · 제외 ${modeParsed.skipped.length}개` : ''} · {modeLang === 'ko' ? '한국어' : '영어'}</p>
         <div className="admin-row">
-          <button className="go" type="button" disabled={busy || !modeName.trim() || !modeParsed.rows.length} onClick={saveMode}>{busy ? '저장 중…' : modeId ? '모드 수정 및 단어 추가' : '모드 생성'}</button>
+          <button className="go" type="button" disabled={busy || !modeName.trim() || (!modeId && !modeParsed.rows.length)} onClick={saveMode}>{busy ? '저장 중…' : modeId ? '모드 수정 및 단어 추가' : '모드 생성'}</button>
           {modeId && <button className="ghost" type="button" onClick={resetModeForm}>취소</button>}
         </div>
         {modes.length > 0 && <div className="mode-list">
