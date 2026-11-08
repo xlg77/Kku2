@@ -17,7 +17,8 @@ export function Stepper({ label, value, min, max, onChange, unit, disabled }) {
 
 /** 모드·라운드·봇·시간·규칙 입력 (혼자 하기 / 멀티 방 설정 공용) */
 export default function SettingsFields({ s, set, minBots = 1, maxBots = 7, disabled = false }) {
-  const selectedCustom = customModes.find((m) => m.id === s.mode);\n  const mode = MODES[selectedCustom?.base_mode || s.mode] || MODES.KSH;
+  const selectedCustom = customModes.find((m) => m.id === s.mode);
+  const mode = MODES[selectedCustom?.base_mode || s.mode] || MODES.KSH;
   return (
     <>
       <div className="field">
