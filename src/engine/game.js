@@ -35,7 +35,9 @@ export class Game {
     return {
       ...prev,
       rounds: this.cfg.rounds,
-      mode: this.mode,
+      mode: this.modeId,
+      baseMode: this.mode,
+      modeName: this.modeName,
       opts: this.opts,
       seq: this.seq,
       turn: this.turn,
