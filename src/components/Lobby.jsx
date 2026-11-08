@@ -22,7 +22,8 @@ export const loadSettings = () => {
 export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersion }) {
   const [s, setS] = useState(loadSettings);
   const [customModes, setCustomModes] = useState([]);
-  useEffect(() => { fetchCustomModes().then((modes) => { setCustomModes(modes); if (String(s.mode).startsWith('CM') && !modes.some((m) => m.id === s.mode)) setS((p) => ({ ...p, mode: 'KSH' })); }).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e)); }, []);
+  const refreshCustomModes = () => fetchCustomModes().then((modes) => { setCustomModes(modes); if (String(s.mode).startsWith('CM') && !modes.some((m) => m.id === s.mode)) setS((p) => ({ ...p, mode: 'KSH' })); }).catch((e) => console.warn('[Kku2] 사용자 제작 모드 목록:', e));
+  useEffect(() => { refreshCustomModes(); }, []);
   useEffect(() => {
     const unlock = () => { void unlockAudio().catch(() => {}); };
     window.addEventListener('pointerdown', unlock, { once: true, passive: true });
@@ -71,7 +72,7 @@ export default function Lobby({ onStart, onMulti, loading, error, auth, lbVersio
 
         <Leaderboard meId={auth.user?.id} version={lbVersion} />
 
-        {auth.isAdmin && <AdminPanel />}
+        {auth.isAdmin && <AdminPanel onModesChanged={refreshCustomModes} />}
 
         <footer className="foot">
           <p>
