@@ -12,7 +12,7 @@ export class Game {
   constructor(cfg) {
     this.cfg = cfg;
     this.dict = cfg.dict;
-    this.mode = cfg.mode;
+    this.mode = cfg.baseMode || cfg.mode;\n    this.modeId = cfg.modeId || cfg.mode;\n    this.modeName = cfg.modeName || MODES[this.mode].name;
     this.opts = cfg.opts || {};
     this.lang = MODES[this.mode].lang;
     this.timers = new Set();
