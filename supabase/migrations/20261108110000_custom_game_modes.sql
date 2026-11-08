@@ -320,3 +320,37 @@ grant execute on function public.kk_admin_mode_save(text,text,text,text,text,boo
 grant execute on function public.kk_admin_mode_words(text,text,jsonb) to anon,authenticated;
 grant execute on function public.kk_admin_modes_list(text) to anon,authenticated;
 grant execute on function public.kk_admin_mode_delete(text,text) to anon,authenticated;
+
+
+-- Refresh the dictionary cache version after every word upload.
+create or replace function public.kk_custom_dict_info(p_mode text)
+returns jsonb language sql stable security definer set search_path to ''
+as $$
+ select jsonb_build_object('lang',cm.lang,'base_mode',cm.base_mode,
+  'count',(select count(*) from kkutu_private.custom_mode_words w where w.mode_id=cm.id),
+  'updated_at',cm.updated_at)
+ from public.custom_modes cm where cm.id=p_mode and cm.is_public
+$$;
+
+create or replace function public.kk_admin_mode_words(p_token text,p_mode text,p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path to ''
+as $$
+declare v uuid:=kkutu_private.session_account(p_token); lg text; n int;
+begin
+ if v is null or not exists(select 1 from kkutu_private.accounts a where a.id=v and a.is_admin) then return jsonb_build_object('error','forbidden'); end if;
+ select lang into lg from public.custom_modes where id=p_mode;
+ if lg is null then return jsonb_build_object('error','not_found'); end if;
+ if jsonb_typeof(p_rows)<>'array' or jsonb_array_length(p_rows)>2000 then return jsonb_build_object('error','bad_input'); end if;
+ with src as (
+  select distinct on (x.word) x.word,
+   (case when coalesce(x.loanword,false) then 1 else 0 end | case when coalesce(x.injeong,false) then 2 else 0 end)::smallint as flag,
+   coalesce(x.strict,true) as strict
+  from jsonb_to_recordset(p_rows) as x(word text,loanword boolean,injeong boolean,strict boolean)
+  where (lg='ko' and x.word ~ '^[가-힣]{2,}$') or (lg='en' and x.word ~ '^[a-z]{2,}$') order by x.word
+ ), ins as (
+  insert into kkutu_private.custom_mode_words(mode_id,word,flag,strict,hit)
+  select p_mode,word,flag,strict,3 from src on conflict(mode_id,word) do update set flag=excluded.flag,strict=excluded.strict returning 1
+ ) select count(*) into n from ins;
+ update public.custom_modes set updated_at=now() where id=p_mode;
+ return jsonb_build_object('ok',true,'count',n);
+end $$;
