@@ -37,8 +37,12 @@ export default function App() {
     setError('');
     setLoading({ pct: 0 });
     try {
-      const dict = await dictFor(MODES[cfg.mode].lang, (pct) => setLoading({ pct }));
-      const title = makeTitle(dict, cfg.mode, cfg.rounds, cfg.opts || {});
+      const baseMode = cfg.baseMode || cfg.mode;
+      const progress = (pct) => setLoading({ pct });
+      const dict = String(cfg.mode).startsWith('CM')
+        ? await loadCustomModeDict(cfg.mode, progress)
+        : await dictFor(MODES[baseMode].lang, progress);
+      const title = makeTitle(dict, baseMode, cfg.rounds, cfg.opts || {});
       setScreen({ name: 'game', cfg: { ...cfg, baseMode, dict, title }, key: Date.now() });
     } catch (e) {
       setError(String(e.message || e));
