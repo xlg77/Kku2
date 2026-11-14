@@ -27,7 +27,7 @@ npm run build   # dist/ 생성
 ## 단어 주제 (게임 중 단어 아래에 표시)
 방금 이은 단어에 주제가 있으면 단어 아래에 주제 이름이 나옵니다 (겹치는 주제는 모두 표시). 주제 데이터는 `public/data/themes/*.txt` (단어 첫 글자별 조각 파일, 필요한 조각만 받아 옴) 이고, 주제 목록은 `src/engine/themes.js` 입니다.
 - 원본 `db.sql` 의 theme 열(분야 53개 + 포켓몬·디지몬·메이플스토리 등)을 목록에 맞춰 옮긴 것: `npm run themes`
-- 원본에 없는 주제(넷플릭스, 원신, 직업 …)는 `scripts/theme-extra/*.tsv` 에 `주제<TAB>단어` 로 한 줄씩 적고 `npm run themes` 를 다시 돌리면 합쳐집니다. (`scripts/theme-extra/README.md`)
+- 원본에 없는 주제(넷플릭스, 원신, 직업 …)는 `scripts/theme-extra/*.txt` 에 `@주제 이름` + 단어들을 적고 `npm run themes` 를 다시 돌리면 합쳐집니다. (`curated.txt` 는 일부만 담은 초안) (`scripts/theme-extra/README.md`)
 
 ## 라이선스
 원본과 같은 GPL-3.0 (`LICENSE`). 영어 사전은 Princeton WordNet 자료를 포함합니다.

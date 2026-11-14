@@ -1,8 +1,8 @@
 // db.sql(원본 끄투 단어 DB 덤프)의 theme 열을 읽어, 단어별 주제 조각 파일(public/data/themes/*.txt)을 만든다.
 // 사용법: node scripts/build-themes.mjs <db.sql 경로> [출력 디렉터리]
 //
-// 원본에 없는 주제(넷플릭스, 원신, 직업 …)는 scripts/theme-extra/*.tsv 에 `주제<TAB>단어` 로 한 줄씩 적어 두면
-// 함께 합쳐진다. (주제 이름은 src/engine/themes.js 의 THEME_NAMES 와 똑같이 써야 한다.)
+// 원본에 없는 주제(넷플릭스, 원신, 직업 …)는 scripts/theme-extra/*.txt 에 `@주제 이름` 줄 + 공백으로 나눈 단어들 (또는 `주제<TAB>단어`)로
+// 적어 두면 함께 합쳐진다. (주제 이름은 src/engine/themes.js 의 THEME_NAMES 와 똑같이 써야 한다.)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,14 +39,21 @@ for (let i = start + 1; lines[i] !== '\\.'; i++) {
 const extraDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'theme-extra');
 let extra = 0;
 if (fs.existsSync(extraDir)) {
-  for (const f of fs.readdirSync(extraDir).filter((x) => x.endsWith('.tsv'))) {
-    fs.readFileSync(path.join(extraDir, f), 'utf8').replace(/^﻿/, '').split(/\r?\n/).forEach((raw, n) => {
+  for (const f of fs.readdirSync(extraDir).filter((x) => x.endsWith('.tsv') || x.endsWith('.txt'))) {
+    let cur = null; // `@주제 이름` 줄 다음에 오는 줄들은 공백으로 나눈 단어들
+    fs.readFileSync(path.join(extraDir, f), 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).forEach((raw, n) => {
       if (!raw.trim() || raw.startsWith('#')) return;
-      const [name, w] = raw.split('\t').map((x) => x.trim());
-      const id = themeId(name);
-      if (id === undefined) throw new Error(`${f} ${n + 1}행: 알 수 없는 주제 "${name}"`);
-      if (!/^[가-힣]{2,}$/.test(w || '')) throw new Error(`${f} ${n + 1}행: 단어는 한글 2글자 이상이어야 해요 "${w}"`);
-      add(w, id); extra++;
+      const where = `${f} ${n + 1}행`;
+      const put = (name, w) => {
+        const id = themeId(name);
+        if (id === undefined) throw new Error(`${where}: 알 수 없는 주제 "${name}"`);
+        if (!/^[가-힣]{2,}$/.test(w || '')) throw new Error(`${where}: 단어는 한글 2글자 이상이어야 해요 "${w}"`);
+        add(w, id); extra++;
+      };
+      if (raw.startsWith('@')) { cur = raw.slice(1).trim(); if (themeId(cur) === undefined) throw new Error(`${where}: 알 수 없는 주제 "${cur}"`); return; }
+      if (raw.includes('\t')) { const [name, w] = raw.split('\t').map((x) => x.trim()); put(name, w); return; }
+      if (cur === null) throw new Error(`${where}: 먼저 @주제 줄이 필요해요`);
+      for (const w of raw.trim().split(/\s+/)) put(cur, w);
     });
   }
 }
