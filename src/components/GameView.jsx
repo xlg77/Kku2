@@ -3,6 +3,7 @@ import { MODES, OPT_LABELS, isChainable } from '../engine/rules.js';
 import TimerBar from './TimerBar.jsx';
 import Result from './Result.jsx';
 import { sfx, isMuted, setMuted, getAudioContext, unlockAudio } from '../sfx.js';
+import { lookupThemes } from '../engine/themeLookup.js';
 
 let specialAudioContext = null;
 let specialAudioBuffers = null;
@@ -207,7 +208,17 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
     setMsg('');
     if (!pendingPrediction) input.current?.focus({ preventScroll: true });
   }, [myTurn, s?.turnAt]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { histRef.current?.scrollTo({ top: histRef.current.scrollHeight, behavior: 'smooth' }); }, [s?.chain?.length]);
+  // 방금 이은 단어의 주제 이름 (단어 아래에 보여준다)
+  const lastWord = s?.chain?.length ? s.chain[s.chain.length - 1] : '';
+  const [wordThemes, setWordThemes] = useState({ word: '', names: [] });
+  useEffect(() => {
+    let live = true;
+    if (!lastWord) { setWordThemes({ word: '', names: [] }); return undefined; }
+    lookupThemes(lastWord).then((names) => { if (live) setWordThemes({ word: lastWord, names }); });
+    return () => { live = false; };
+  }, [lastWord]);
+  const shownThemes = wordThemes.word === lastWord ? wordThemes.names : [];
+  useEffect(() => { histRef.current?.scrollTo({ top: histRef.current.scrollHeight, behavior: 'smooth' }); }, [s?.chain?.length, shownThemes.length]);
 
   async function sendWord(word, predicted = false) {
     const r = await submitFn(word);
@@ -305,6 +316,12 @@ export default function GameView({ store, meId, submit: submitFn, record, onExit
           return <span key={idx + w} className={'chip' + (i === recent.length - 1 ? ' new' : '')}>{w}</span>;
         })}
         {!chain.length && <span className="hint">첫 단어를 이어보세요!</span>}
+        {shownThemes.length > 0 && (
+          <div className="themes" aria-label={`${lastWord}의 주제`}>
+            <span className="themes-word">{lastWord}</span>
+            {shownThemes.map((t) => <span key={t} className="theme-chip">{t}</span>)}
+          </div>
+        )}
       </div>
 
       <section className="players" aria-label="플레이어">

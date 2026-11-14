@@ -597,3 +597,9 @@ body { overflow-x: clip; }
   .auth-page { padding-left: 12px; padding-right: 12px; }
   .auth-card { padding: 18px 14px; }
 }
+
+/* 방금 이은 단어의 주제 (모바일에서도 줄바꿈되어 화면 밖으로 넘치지 않음) */
+.themes { flex: 0 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 2px 2px 4px; min-width: 0; }
+.themes-word { font-weight: 800; font-size: 13px; margin-right: 2px; overflow-wrap: anywhere; }
+.theme-chip { padding: 2px 8px; border-radius: 99px; border: 1.5px solid #9ec3dd; background: #eaf5fd; color: #2f5d80; font-size: 12px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+@media (prefers-color-scheme: dark) { .theme-chip { background: color-mix(in srgb, var(--paper) 80%, #4aa3df); color: inherit; border-color: color-mix(in srgb, var(--line) 60%, #4aa3df); } }

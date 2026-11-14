@@ -85,3 +85,26 @@ test('봇 4명이 5개 모드를 한 판씩 (규칙 위반 없이 이어짐)', a
     console.log(mode, words.join(' → '));
   });
 });
+
+test('단어 주제: 목록·조각 파일', async () => {
+  const { THEME_NAMES, ORIGIN_CODES, themeId, themeShard, parseThemeShard, themeNames } = await import('../src/engine/themes.js');
+  assert.equal(new Set(THEME_NAMES).size, THEME_NAMES.length); // 이름 중복 없음
+  for (const name of Object.values(ORIGIN_CODES)) assert.notEqual(themeId(name), undefined, name);
+  assert.equal(themeShard('가'), 0);
+  assert.equal(themeShard('힣'), 253);
+  assert.equal(themeShard('abc'), 254);
+  const find = (w) => {
+    const m = parseThemeShard(fs.readFileSync(`public/data/themes/${themeShard(w)}.txt`, 'utf8'));
+    return themeNames(m.get(w));
+  };
+  assert.ok(find('럭시오').includes('포켓몬스터'));
+  assert.ok(find('레오나').includes('리그 오브 레전드'));
+  assert.ok(find('도동항').includes('지명'));
+  assert.deepEqual(find('끄투프리'), []); // 주제 없는 단어
+  // 조각 안의 모든 번호가 목록 범위 안
+  for (const f of fs.readdirSync('public/data/themes')) {
+    for (const ids of parseThemeShard(fs.readFileSync(`public/data/themes/${f}`, 'utf8')).values()) {
+      for (const id of ids) assert.ok(id >= 0 && id < THEME_NAMES.length, `${f}: ${id}`);
+    }
+  }
+});
